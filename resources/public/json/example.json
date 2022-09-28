@@ -1,0 +1,105 @@
+{
+  "date": {
+    "type": "date",
+    "name": "Date",
+    "description": ""
+  },
+  "people": {
+    "type": "multiselect",
+    "name": "Skier",
+    "description": "",
+    "options": {
+      "aaaa": {
+        "name": "Laura",
+        "description": "",
+        "attributes": {
+          "jackets": {
+            "type": "multiselect",
+            "name": "Jackets",
+            "options": {
+              "aaaa": {
+                "name": "soft",
+                "description": ""
+              },
+              "bbbb": {
+                "name": "heavy",
+                "description": ""
+              },
+              "cccc": {
+                "name": "hard",
+                "description": ""
+              }
+            }
+          },
+          "skis": {
+            "type": "singleselect",
+            "name": "Skis",
+            "options": {
+              "aaaa": {
+                "name": "102",
+                "description": ""
+              },
+              "bbbb": {
+                "name": "94UH",
+                "description": ""
+              }
+            }
+          }
+        }
+      },
+      "bbbb": {
+        "name": "William",
+        "description": "",
+        "attributes": {
+          "jackets": {
+            "type": "multiselect",
+            "name": "Jackets",
+            "options": {
+              "aaaa": {
+                "name": "soft",
+                "description": ""
+              },
+              "bbbb": {
+                "name": "heavy",
+                "description": ""
+              }
+            }
+          },
+          "skis": {
+            "type": "singleselect",
+            "name": "Skis",
+            "options": {
+              "aaaa": {
+                "name": "96UH",
+                "description": ""
+              },
+              "bbbb": {
+                "name": "96Tele",
+                "description": ""
+              },
+              "cccc": {
+                "name": "Vantages",
+                "description": ""
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "resort": {
+    "type": "singleselect",
+    "name": "Resort",
+    "description": "",
+    "options": {
+      "aaaa": {
+        "name": "Winter Park",
+        "description": ""
+      },
+      "bbbb": {
+        "name": "Granby Ranch",
+        "description": ""
+      }
+    }
+  }
+}

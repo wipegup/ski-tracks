@@ -38,6 +38,52 @@
                   :response-format (ajax/raw-response-format)
                   :on-success       [:set-docs]}}))
 
+(defn select-options-false [h]
+  (into {}
+    (map
+    (fn [[k v]] [k (assoc v :selected false)])
+    h))
+)
+
+(defn selected-false
+  ([h] (selected-false h {}))
+  ([arrs to-ret]
+    (if (empty? arrs)
+      to-ret
+      (let [[k v] (first arrs)]
+        (if (:options v)
+          (recur (rest arrs) (assoc to-ret k
+            (assoc v :options
+              (into {} (map
+                (fn [[k2 v2]]
+                  [k2
+                    (if (:attributes v2)
+                      (assoc v2 :attributes (selected-false (:attributes v2)))
+                      v2)])
+                (:options (assoc v :options (select-options-false (:options v)))))))))
+          (recur (rest arrs) (assoc to-ret k v)))))))
+
+(rf/reg-event-db
+  :set-entry-info
+  (fn [db [_ info]]
+
+    (assoc db :entry-info (selected-false info)))
+)
+
+(rf/reg-event-db
+  :set-bad-entry-info
+  (fn [db _]
+    (assoc db :entry-info "NO")))
+
+(rf/reg-event-fx
+  :get-entry-info
+  (fn [_ _]
+    {:http-xhrio {:method          :get
+                  :uri             "/api/entry-info"
+                  :response-format (ajax/json-response-format {:keywords? true})
+                  :on-success       [:set-entry-info]
+                  :on-failure       [:set-bad-entry-info]}}))
+
 (rf/reg-event-db
   :common/set-error
   (fn [db [_ error]]
@@ -48,6 +94,32 @@
   (fn [_ _]
     {:dispatch [:fetch-docs]}))
 
+(rf/reg-event-db
+  :toggle-multi-select
+  (fn [db [_ opt k]]
+    (assoc-in db [:entry-info opt :options k :selected] (-> db :entry-info opt :options k :selected not))
+    ))
+
+(rf/reg-event-db
+  :toggle-single-select
+  (fn [db [_ opt toggle_key]]
+    (assoc-in db [:entry-info opt :options]
+      (into {}
+        (map (fn [[k v]]
+          [k (if (= k toggle_key)
+                (assoc v :selected (-> v :selected not))
+                (assoc v :selected false)
+          )]
+          )
+          (-> db :entry-info opt :options)
+        )))
+    ))
+
+(rf/reg-event-db
+  :add-entry-info
+  (fn [db [_ k v]]
+    (assoc-in db [:entry-info k :selected] v)
+    ))
 ;;subscriptions
 
 (rf/reg-sub
@@ -71,6 +143,11 @@
   :docs
   (fn [db _]
     (:docs db)))
+
+(rf/reg-sub
+  :entry-info
+  (fn [db _]
+    (:entry-info db)))
 
 (rf/reg-sub
   :common/error
