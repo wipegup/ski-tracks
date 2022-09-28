@@ -1,7 +1,7 @@
 FROM openjdk:8-alpine
 
-COPY target/uberjar/ski-tracks.jar /ski-tracks/app.jar
+COPY target/default+uberjar/ski-tracks.jar /ski-tracks/app.jar
 
-EXPOSE 3000
+EXPOSE 8080
 
 CMD ["java", "-jar", "/ski-tracks/app.jar"]
