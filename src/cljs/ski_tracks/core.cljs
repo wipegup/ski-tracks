@@ -47,7 +47,10 @@
    [:h1 "You gott here"]])
 
 (defn entry-page []
-  (when-let [info @(rf/subscribe [:entry-info])]
+  (let [
+    info @(rf/subscribe [:entry-info])
+    complete @(rf/subscribe [:valid-entry?])
+    ]
   [:section.section>div.container>div.content
    [:h1 "Entry Start"]
 
@@ -59,7 +62,8 @@
             ^{:key (str item-key "-" opt-key)}[:input
                       { :type "button"
                         :value (:name opt-info)
-                        :style {:color "white" :background-color (if (:selected opt-info) "green" "red")}
+                        :style {:color "white"
+                          :background-color (if (:selected opt-info) "green" "red")}
                         :on-click (fn [_] (rf/dispatch [
                           (if (= (:type item-info) "multiselect") :toggle-multi-select :toggle-single-select) item-key opt-key]))
               }]
@@ -68,20 +72,17 @@
           ^{:key (str item-key "-input")}[:input {
             :type (:type item-info)
             :on-change (fn [e] (rf/dispatch [:add-entry-db-info item-key (some-> e .-target .-value)]) )
+            :value (-> info item-key :selected)
           }])
       ]
     )
-    [:section.other-area [:h2 (if (not
-      (some false? (map (fn [[_ v]] (v :valid?)) info))
-      )
-      "YEEAH"
-      "NO"
-      )]]
-    [:section.submit-area [:input {:type "button" :value "Start Entry" :on-click #(
-      (rf/dispatch [:check-input-and-redirect info :skier-gear])
-
-      ) }]]
-   ]))
+    [:section.submit-area [:input (cond->
+      {:type "button" :value "Start Entry"
+    :on-click (fn [_]
+      (rf/dispatch [:common/navigate! :skier-gear])
+      ) }
+      (not complete) (assoc :disabled "true")
+      )]]]))
 
 (defn home-page []
   [:section.section>div.container>div.content

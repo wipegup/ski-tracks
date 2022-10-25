@@ -40,25 +40,11 @@
   )
 )
 
-(rf/reg-event-fx
-  :check-input-and-redirect
-  (fn [_ [_ info redirect]]
-      (if
-        (some false? (map (fn [[_ v]] (v :valid?)) info))
-        {:show-alert ["NO"]}
-
-        {:common/navigate-fx! [redirect]}
-      )
-      ))
-
 (rf/reg-fx
  :show-alert
  (fn [message]
    (js/alert (str "I was asked to print this: " message))))
 
-(rf/reg-event-fx
-  :check-initial-values
-  (fn []))
 
 (rf/reg-event-db
   :set-docs
@@ -87,12 +73,13 @@
 
 (rf/reg-event-fx
   :get-entry-info
-  (fn [_ _]
+  (fn [cofx _]
+    (when (not (-> cofx :db :entry-info))
     {:http-xhrio {:method          :get
                   :uri             "/api/entry-info"
                   :response-format (ajax/json-response-format {:keywords? true})
                   :on-success       [:set-entry-info]
-                  :on-failure       [:set-bad-entry-info]}}))
+                  :on-failure       [:set-bad-entry-info]}})))
 
 (rf/reg-event-db
   :common/set-error
@@ -198,6 +185,17 @@
   :entry-info
   (fn [db _]
     (:entry-info db)))
+
+(defn all-valid? [info]
+  (not (some false? (map (fn [[_ v]] (v :valid?)) info))))
+
+(rf/reg-sub
+  :valid-entry?
+  :<- [:entry-info]
+  (fn [info]
+    (all-valid? info)
+    )
+  )
 
 (rf/reg-sub
   :common/error
