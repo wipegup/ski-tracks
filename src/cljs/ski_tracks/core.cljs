@@ -38,18 +38,22 @@
                  [nav-link "#/entry" "Entry" :entry]
                  ]]]))
 
-(defn about-page []
+(defn about-page [_]
   [:section.section>div.container>div.content
    [:img {:src "/img/warning_clojure.png"}]])
 
+(defn skier-gear-page [_]
+  [:section.section>div.container>div.content
+   [:h1 "You gott here"]])
+
 (defn entry-page []
+  (when-let [info @(rf/subscribe [:entry-info])]
   [:section.section>div.container>div.content
    [:h1 "Entry Start"]
 
-   (when-let [info @(rf/subscribe [:entry-info])]
     (for [[item-key item-info] info]
       ^{:key (str item-key "-section")}[:section.select-area
-        ^{:key (str item-key "-header")}[:h2 (str (:name item-info) " Selects")]
+        ^{:key (str item-key "-header")}[:h2 (str (:name item-info) " Select")]
         (if (string/includes? (:type item-info) "select")
           ( for [[opt-key opt-info] (:options item-info)]
             ^{:key (str item-key "-" opt-key)}[:input
@@ -63,23 +67,21 @@
 
           ^{:key (str item-key "-input")}[:input {
             :type (:type item-info)
-            :on-change #( (rf/dispatch [:add-entry-info item-key (-> % .-target .-value)]) )
+            :on-change (fn [e] (rf/dispatch [:add-entry-db-info item-key (some-> e .-target .-value)]) )
           }])
       ]
     )
+    [:section.other-area [:h2 (if (not
+      (some false? (map (fn [[_ v]] (v :valid?)) info))
+      )
+      "YEEAH"
+      "NO"
+      )]]
+    [:section.submit-area [:input {:type "button" :value "Start Entry" :on-click #(
+      (rf/dispatch [:check-input-and-redirect info :skier-gear])
 
-
-    ;  (for [[k person-info] (-> info :people :options)]
-    ;  ^{:key (str "person-" k)}
-    ;     [:input { :type "button"
-    ;               :value (:name person-info)
-    ;               :style {:color "white" :background-color (if (:selected person-info) "green" "red")}
-    ;               :on-click (fn [_] (rf/dispatch [:toggle-person-select k]))
-    ;    }])
-    ; [:h1 "Skier Select"]
-    ; [:h2 "Resoasdrt Select"][:h3 "asdg"]
-    )
-   ])
+      ) }]]
+   ]))
 
 (defn home-page []
   [:section.section>div.container>div.content
@@ -105,6 +107,9 @@
       ["/entry" {:name :entry
                 :view #'entry-page
                 :controllers [{:start (fn [_] (rf/dispatch [:get-entry-info]))}]}]
+      ["/skier-gear" {:name :skier-gear
+                      :view #'skier-gear-page
+                      }]
                 ]))
 
 (defn start-router! []

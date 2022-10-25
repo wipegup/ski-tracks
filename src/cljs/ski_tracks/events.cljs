@@ -3,7 +3,8 @@
     [re-frame.core :as rf]
     [ajax.core :as ajax]
     [reitit.frontend.easy :as rfe]
-    [reitit.frontend.controllers :as rfc]))
+    [reitit.frontend.controllers :as rfc]
+    [clojure.string :as string]))
 
 ;;dispatchers
 
@@ -25,6 +26,40 @@
   (fn [_ [_ url-key params query]]
     {:common/navigate-fx! [url-key params query]}))
 
+(defn alert-string [info]
+  (str
+    "Not enought"
+    ; (map (fn [[_ v]]
+    ;   (if (:required v)
+    ;     (if (string/includes? (:type item-info) "select")
+    ;
+    ;     )
+    ;     nil
+    ;   )
+    ;   ))
+  )
+)
+
+(rf/reg-event-fx
+  :check-input-and-redirect
+  (fn [_ [_ info redirect]]
+      (if
+        (some false? (map (fn [[_ v]] (v :valid?)) info))
+        {:show-alert ["NO"]}
+
+        {:common/navigate-fx! [redirect]}
+      )
+      ))
+
+(rf/reg-fx
+ :show-alert
+ (fn [message]
+   (js/alert (str "I was asked to print this: " message))))
+
+(rf/reg-event-fx
+  :check-initial-values
+  (fn []))
+
 (rf/reg-event-db
   :set-docs
   (fn [db [_ docs]]
@@ -38,36 +73,11 @@
                   :response-format (ajax/raw-response-format)
                   :on-success       [:set-docs]}}))
 
-(defn select-options-false [h]
-  (into {}
-    (map
-    (fn [[k v]] [k (assoc v :selected false)])
-    h))
-)
-
-(defn selected-false
-  ([h] (selected-false h {}))
-  ([arrs to-ret]
-    (if (empty? arrs)
-      to-ret
-      (let [[k v] (first arrs)]
-        (if (:options v)
-          (recur (rest arrs) (assoc to-ret k
-            (assoc v :options
-              (into {} (map
-                (fn [[k2 v2]]
-                  [k2
-                    (if (:attributes v2)
-                      (assoc v2 :attributes (selected-false (:attributes v2)))
-                      v2)])
-                (:options (assoc v :options (select-options-false (:options v)))))))))
-          (recur (rest arrs) (assoc to-ret k v)))))))
 
 (rf/reg-event-db
   :set-entry-info
   (fn [db [_ info]]
-
-    (assoc db :entry-info (selected-false info)))
+    (assoc db :entry-info info))
 )
 
 (rf/reg-event-db
@@ -94,16 +104,54 @@
   (fn [_ _]
     {:dispatch [:fetch-docs]}))
 
+(defn root-path [path]
+  (let [seq-path (if (sequential? path) path [path])]
+   (into [] (cons :entry-info seq-path))))
+
+(defn extend-path [path & ext]
+  (into [] (concat (root-path path) ext)))
+
+(defn selected-path
+  ([path opt-key] (extend-path path :options opt-key :selected))
+  ([path] (extend-path path :selected))
+  )
+
+(defn valid-path [path]
+  (extend-path path :valid?))
+
+(defn options-path [path]
+  (extend-path path :options))
+
+(defn required-path [path]
+  (extend-path path :required))
+
+(defn valid-select? [db path]
+  (let [root (root-path path)]
+    (boolean (or (not (get-in db
+      (required-path path)))
+    (some true?
+    (map (fn [[_ v]] (v :selected)) (get-in db (options-path path)) )
+  ) ) ))
+  )
+
 (rf/reg-event-db
   :toggle-multi-select
-  (fn [db [_ opt k]]
-    (assoc-in db [:entry-info opt :options k :selected] (-> db :entry-info opt :options k :selected not))
+  (fn [db [_ path opt-key]]
+    (let [
+      selected-path (selected-path path opt-key)
+      tog
+          (assoc-in db selected-path (not (get-in db selected-path)))
+      ]
+          (assoc-in tog (valid-path path) (valid-select? tog path))
+        )
     ))
 
 (rf/reg-event-db
   :toggle-single-select
-  (fn [db [_ opt toggle_key]]
-    (assoc-in db [:entry-info opt :options]
+  (fn [db [_ path toggle_key]]
+    (let [
+      options-path (options-path path)
+      tog (assoc-in db options-path
       (into {}
         (map (fn [[k v]]
           [k (if (= k toggle_key)
@@ -111,15 +159,17 @@
                 (assoc v :selected false)
           )]
           )
-          (-> db :entry-info opt :options)
+          (get-in db options-path)
         )))
-    ))
+        ]
+        (assoc-in tog (valid-path path) (valid-select? tog path)))))
 
 (rf/reg-event-db
-  :add-entry-info
-  (fn [db [_ k v]]
-    (assoc-in db [:entry-info k :selected] v)
-    ))
+  :add-entry-db-info
+  (fn [db [_ path v]]
+    (let [tog (assoc-in db (selected-path path) v)]
+      (assoc-in tog (valid-path path) true))))
+
 ;;subscriptions
 
 (rf/reg-sub

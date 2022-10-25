@@ -12,6 +12,50 @@
     [clojure.java.io :as io]
     [clojure.data.json :as json]))
 
+    (defn add-to-arr [h mod-func]
+      (into {}
+        (map
+          (fn [[k v]] [k (mod-func v)])
+          h))
+    )
+
+    (defn loop-hashes
+      ([h mod-func] (loop-hashes h mod-func {}))
+      ([arrs mod-func to-ret]
+        (if (empty? arrs)
+          to-ret
+          (let [[k v] (first arrs)]
+            (recur (rest arrs) mod-func (assoc to-ret k (mod-func v)))))))
+
+    (defn add-valid-func [v]
+      (assoc v :valid?
+        (not
+        (:required v)
+        )
+        ))
+
+    (defn add-selected-func [v]
+      (if (:options v)
+        (assoc v :options (add-to-arr (:options v) (fn [v] (assoc v :selected false))))
+        v))
+
+    (defn inner-prepare-func [v]
+      (if (v :options)
+        (assoc v :options
+          (add-to-arr (:options v)
+            (fn [v]
+              (if (:attributes v)
+                (assoc v :attributes (-> (:attributes v) (loop-hashes add-valid-func) (loop-hashes add-selected-func)))
+                v))
+              ))
+        v))
+
+  (defn prepare-source [h]
+    (-> h
+      (loop-hashes add-valid-func)
+      (loop-hashes add-selected-func)
+      (loop-hashes inner-prepare-func)))
+
 (defn service-routes []
   ["/api"
    {:coercion spec-coercion/coercion
@@ -50,10 +94,15 @@
    ["/ping"
     {:get (constantly (ok {:message "pong"}))}]
 
+
    ["/entry-info"
     {:get { :summary "emits static example json"
             :handler (fn [_]
               {:status 200
-               :body (json/read-str
-                 (-> "public/json/example.json" io/resource slurp )
-                 :key-fn keyword)})}}]])
+               :body
+                 (-> "public/json/example.json"
+                 io/resource
+                 slurp
+                 (json/read-str :key-fn keyword)
+                 prepare-source )
+                 })}}]])

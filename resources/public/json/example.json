@@ -1,11 +1,13 @@
 {
   "date": {
     "type": "date",
+    "required":true,
     "name": "Date",
     "description": ""
   },
   "people": {
     "type": "multiselect",
+    "required":true,
     "name": "Skier",
     "description": "",
     "options": {
@@ -15,6 +17,7 @@
         "attributes": {
           "jackets": {
             "type": "multiselect",
+            "required":true,
             "name": "Jackets",
             "options": {
               "aaaa": {
@@ -28,11 +31,16 @@
               "cccc": {
                 "name": "hard",
                 "description": ""
+              },
+              "dddd": {
+                "name": "none",
+                "description": ""
               }
             }
           },
           "skis": {
             "type": "singleselect",
+            "required":true,
             "name": "Skis",
             "options": {
               "aaaa": {
@@ -53,6 +61,7 @@
         "attributes": {
           "jackets": {
             "type": "multiselect",
+            "required":true,
             "name": "Jackets",
             "options": {
               "aaaa": {
@@ -62,11 +71,16 @@
               "bbbb": {
                 "name": "heavy",
                 "description": ""
+              },
+              "cccc": {
+                "name": "none",
+                "description": ""
               }
             }
           },
           "skis": {
             "type": "singleselect",
+            "required":true,
             "name": "Skis",
             "options": {
               "aaaa": {
@@ -89,6 +103,7 @@
   },
   "resort": {
     "type": "singleselect",
+    "required":true,
     "name": "Resort",
     "description": "",
     "options": {

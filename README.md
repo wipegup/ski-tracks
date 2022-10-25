@@ -14,8 +14,14 @@ You will need [Leiningen][1] 2.0 or above installed.
 
 To start a web server for the application, run:
 
-    lein run 
+    lein run
 
 ## License
 
 Copyright © 2022 FIXME
+
+
+```
+npx shadow-cljs watch app
+lein run
+```
