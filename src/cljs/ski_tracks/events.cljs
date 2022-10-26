@@ -26,20 +26,6 @@
   (fn [_ [_ url-key params query]]
     {:common/navigate-fx! [url-key params query]}))
 
-(defn alert-string [info]
-  (str
-    "Not enought"
-    ; (map (fn [[_ v]]
-    ;   (if (:required v)
-    ;     (if (string/includes? (:type item-info) "select")
-    ;
-    ;     )
-    ;     nil
-    ;   )
-    ;   ))
-  )
-)
-
 (rf/reg-fx
  :show-alert
  (fn [message]
@@ -58,7 +44,6 @@
                   :uri             "/docs"
                   :response-format (ajax/raw-response-format)
                   :on-success       [:set-docs]}}))
-
 
 (rf/reg-event-db
   :set-entry-info
@@ -93,7 +78,10 @@
 
 (defn root-path [path]
   (let [seq-path (if (sequential? path) path [path])]
-   (into [] (cons :entry-info seq-path))))
+  (if (= :entry-info (first seq-path))
+    (vec seq-path)
+    (vec (cons :entry-info seq-path)))
+   ))
 
 (defn extend-path [path & ext]
   (into [] (concat (root-path path) ext)))
@@ -108,6 +96,9 @@
 
 (defn options-path [path]
   (extend-path path :options))
+
+(defn selected-option-path [path key]
+  (extend-path (options-path path) key))
 
 (defn required-path [path]
   (extend-path path :required))
@@ -157,6 +148,66 @@
     (let [tog (assoc-in db (selected-path path) v)]
       (assoc-in tog (valid-path path) true))))
 
+;; For Testing
+; (rf/reg-event-db
+;   :add-arbitrary
+;   (fn [db [_ k v]]
+;     (assoc db k v)))
+
+; "people/options/28fdeace-3015-4433-8678-6c4c1583290b/attributes/jackets"
+; "resort/options/b0c38ab8-47a9-4ca1-b8cd-4ceaffe67d95/attributes/hike"
+
+(defn get-keyword-path [path-string]
+  (vec (root-path (map #(keyword %) (string/split path-string #"/")))))
+
+(def simple-blank
+  {:name "" :description "" :selected false :attributes {}})
+
+(rf/reg-event-db
+  :add-new-blank-opt
+  (fn [db [_ type uuid]]
+    (let [
+      init-path (get-keyword-path type)
+      path (selected-option-path init-path (keyword uuid))
+      with-path (assoc-in db [:common/route :path-params :path-vec] path)
+      ]
+    (assoc-in with-path path simple-blank)
+    )))
+
+(defn need-vert? [path-seq]
+  (some #{:hike :lift} path-seq))
+
+(defn complete-new-item? [db seq-path]
+  (let [item (get-in db seq-path)]
+    (if (need-vert? seq-path)
+    (and (< 0 (:vert item)) (not= "" (:name item)))
+    (not= "" (:name item)))))
+
+(rf/reg-event-fx
+  :save-or-discard-opt
+  (fn [{:keys [db] :as cofx} [_ type uuid]]
+    (let [
+      init-path (get-keyword-path type)
+      path (selected-option-path init-path (keyword uuid))
+      entry (get-in db path)]
+      (if (and (:saved entry) (complete-new-item? db path))
+        {:db (update-in db path dissoc :saved)
+          ; :fx [[:dispatch [:update-data path]]]
+        }
+        {:db (update-in db (pop path) dissoc (peek path))}
+      ))))
+
+(rf/reg-event-db
+  :update-new
+  (fn [db [_ path val]]
+    (assoc-in db path val)))
+
+(rf/reg-event-fx
+  :save-new
+  (fn [{:keys [db] :as cofx} [_ path redirect]]
+    {:db (assoc-in db (conj path :saved) true)
+     :fx [[:dispatch [:common/navigate! redirect]]]
+    }))
 ;;subscriptions
 
 (rf/reg-sub
@@ -175,6 +226,19 @@
   :<- [:common/route]
   (fn [route _]
     (-> route :data :view)))
+
+(rf/reg-sub
+  :new-opt-info
+  :<- [:common/route]
+  (fn [route] (-> route :path-params)))
+
+(defn remove-opt-key [path-seq]
+  (reverse (rest (rest (reverse path-seq)))))
+
+(rf/reg-sub
+  :parent-info
+  (fn [db [_ path-to-opt]]
+    (get-in db (remove-opt-key path-to-opt))))
 
 (rf/reg-sub
   :docs
@@ -196,6 +260,16 @@
     (all-valid? info)
     )
   )
+
+(rf/reg-sub
+  :item-info
+  (fn [db [_ path]]
+    (get-in db path)))
+
+(rf/reg-sub
+  :complete-new-item?
+  (fn [db [_ seq-path]]
+    (complete-new-item? db seq-path)))
 
 (rf/reg-sub
   :common/error

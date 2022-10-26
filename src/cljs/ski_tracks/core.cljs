@@ -58,7 +58,9 @@
       ^{:key (str item-key "-section")}[:section.select-area
         ^{:key (str item-key "-header")}[:h2 (str (:name item-info) " Select")]
         (if (string/includes? (:type item-info) "select")
-          ( for [[opt-key opt-info] (:options item-info)]
+          [:section.button-area
+
+            ( for [[opt-key opt-info] (:options item-info)]
             ^{:key (str item-key "-" opt-key)}[:input
                       { :type "button"
                         :value (:name opt-info)
@@ -68,6 +70,14 @@
                           (if (= (:type item-info) "multiselect") :toggle-multi-select :toggle-single-select) item-key opt-key]))
               }]
           )
+          ^{:key (str item-key "-add")}[:input {
+            :type "button" :value (str "Add " (:name item-info))
+            :on-click (fn [_]
+              (rf/dispatch [:common/navigate! :add-item {:type item-key :key (random-uuid) :current-page :entry}])
+              )
+            }]
+          ]
+
 
           ^{:key (str item-key "-input")}[:input {
             :type (:type item-info)
@@ -81,13 +91,72 @@
     :on-click (fn [_]
       (rf/dispatch [:common/navigate! :skier-gear])
       ) }
-      (not complete) (assoc :disabled "true")
+      (not complete) (assoc :disabled "disabled")
       )]]]))
 
 (defn home-page []
   [:section.section>div.container>div.content
    (when-let [docs @(rf/subscribe [:docs])]
      [:div {:dangerouslySetInnerHTML {:__html (md->html docs)}}])])
+
+ (defn need-vert? [path-seq]
+   (some #{:hike :lift} path-seq )
+   )
+
+(defn add-item-page []
+  [:section.section>div.container>div.content
+  (let [
+      path-params @(rf/subscribe [:new-opt-info])
+      path-vec (:path-vec path-params)
+      parent-info @(rf/subscribe [:parent-info path-vec])
+      item-info @(rf/subscribe [:item-info path-vec])
+      complete @(rf/subscribe [:complete-new-item? path-vec])
+      ]
+    [:div
+    [:h2 "New " (parent-info :name)]
+
+    [:section
+      [:h3 "Name"]
+      [:input {:type :text :name :name
+
+        :on-change (fn [e]
+          (rf/dispatch [:update-new (conj path-vec :name) (some-> e .-target .-value)])
+          )
+          }
+          ]
+    ]
+    [:section
+      [:h3 "Description"]
+      [:input {:type :text :name :description
+        :on-change (fn [e]
+          (rf/dispatch [:update-new (conj path-vec :description) (some-> e .-target .-value)])
+          )}]
+    ]
+    (when (need-vert? path-vec)
+    [:section
+      [:h3 "Base Vert"]
+      [:input {:type :number :name :vert}]
+    ])
+
+    [:section.submit-area
+      [:input (cond->
+        {:type :button :value "Save Item"
+      :on-click (fn [_]
+        (rf/dispatch [:save-new path-vec (keyword (:current-page path-params))])
+        ) }
+        (not complete) (assoc :disabled "disabled")
+        )]
+      [:input
+        {:type :button :value "Discard Item"
+      :on-click (fn [_]
+        (rf/dispatch [:common/navigate! (keyword (:current-page path-params))])
+        ) }
+        ]
+    ]
+    ]
+    )
+  ]
+  )
 
 (defn page []
   (if-let [page @(rf/subscribe [:common/page])]
@@ -111,6 +180,17 @@
       ["/skier-gear" {:name :skier-gear
                       :view #'skier-gear-page
                       }]
+      ["/add-item/:current-page/:type/:key" {:name :add-item
+                               :view #'add-item-page
+                               :controllers [{
+                                 :parameters {:path [:type :key :current-page]}
+                                 :start (fn [{:keys [path]}]
+                                   (rf/dispatch [:add-new-blank-opt (:type path) (:key path)])
+                                   )
+                                :stop (fn [{:keys [path]}]
+                                  (rf/dispatch [:save-or-discard-opt (:type path) (:key path) (:current-page path)])
+                                  )
+                               }]}]
                 ]))
 
 (defn start-router! []

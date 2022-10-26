@@ -11,7 +11,7 @@
     "name": "Skier",
     "description": "",
     "options": {
-      "aaaa": {
+      "28fdeace-3015-4433-8678-6c4c1583290b": {
         "name": "Laura",
         "description": "",
         "attributes": {
@@ -20,19 +20,19 @@
             "required":true,
             "name": "Jackets",
             "options": {
-              "aaaa": {
+              "8b17cc56-04d2-4132-a2b4-45ca10053937": {
                 "name": "soft",
                 "description": ""
               },
-              "bbbb": {
+              "715c3a12-76f8-4542-85b8-4389df2b4cd3": {
                 "name": "heavy",
                 "description": ""
               },
-              "cccc": {
+              "29973ae4-7b60-4c06-adc2-e75d4410455d": {
                 "name": "hard",
                 "description": ""
               },
-              "dddd": {
+              "0694bc3a-d137-41f0-80fd-f492a8d23a97": {
                 "name": "none",
                 "description": ""
               }
@@ -43,11 +43,11 @@
             "required":true,
             "name": "Skis",
             "options": {
-              "aaaa": {
+              "860c57a8-d156-4752-8657-20ea7a505216": {
                 "name": "102",
                 "description": ""
               },
-              "bbbb": {
+              "37c86674-83e1-4fa1-8933-61c0d97faf3d": {
                 "name": "94UH",
                 "description": ""
               }
@@ -55,7 +55,7 @@
           }
         }
       },
-      "bbbb": {
+      "b4b83666-ee6f-47a9-84e5-20db5cc13efc": {
         "name": "William",
         "description": "",
         "attributes": {
@@ -64,15 +64,15 @@
             "required":true,
             "name": "Jackets",
             "options": {
-              "aaaa": {
+              "16d7b067-e571-427f-a121-9aff4a57484d": {
                 "name": "soft",
                 "description": ""
               },
-              "bbbb": {
+              "be7ee390-f3eb-42b5-8814-bd6de8c5eccd": {
                 "name": "heavy",
                 "description": ""
               },
-              "cccc": {
+              "7c08436e-612a-4bd2-a56d-2f8636181166": {
                 "name": "none",
                 "description": ""
               }
@@ -83,15 +83,15 @@
             "required":true,
             "name": "Skis",
             "options": {
-              "aaaa": {
+              "be1003d7-f399-4ec2-9856-cdc4003d164f": {
                 "name": "96UH",
                 "description": ""
               },
-              "bbbb": {
+              "c988afc1-50d6-4d63-8e88-c87cf9b7dca3": {
                 "name": "96Tele",
                 "description": ""
               },
-              "cccc": {
+              "31d4345c-931b-4b6e-9e14-5a88307278fd": {
                 "name": "Vantages",
                 "description": ""
               }
@@ -107,11 +107,11 @@
     "name": "Resort",
     "description": "",
     "options": {
-      "aaaa": {
+      "b0c38ab8-47a9-4ca1-b8cd-4ceaffe67d95": {
         "name": "Winter Park",
         "description": ""
       },
-      "bbbb": {
+      "70c65f49-54ff-491f-88d6-fc9cd5f7b5c2": {
         "name": "Granby Ranch",
         "description": ""
       }
