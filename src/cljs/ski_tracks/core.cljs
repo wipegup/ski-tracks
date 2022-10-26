@@ -111,32 +111,19 @@
       parent-info @(rf/subscribe [:parent-info path-vec])
       item-info @(rf/subscribe [:item-info path-vec])
       complete @(rf/subscribe [:complete-new-item? path-vec])
+      inputs (cond-> [[:name :text] [:description :text]]
+               (need-vert? path-vec) (conj [:vert :number]))
       ]
     [:div
     [:h2 "New " (parent-info :name)]
 
-    [:section
-      [:h3 "Name"]
-      [:input {:type :text :name :name
-
-        :on-change (fn [e]
-          (rf/dispatch [:update-new (conj path-vec :name) (some-> e .-target .-value)])
-          )
-          }
-          ]
-    ]
-    [:section
-      [:h3 "Description"]
-      [:input {:type :text :name :description
-        :on-change (fn [e]
-          (rf/dispatch [:update-new (conj path-vec :description) (some-> e .-target .-value)])
-          )}]
-    ]
-    (when (need-vert? path-vec)
-    [:section
-      [:h3 "Base Vert"]
-      [:input {:type :number :name :vert}]
-    ])
+    (for [[input type] inputs]
+      ^{:key (str input "-section")}[:section
+        ^{:key (str input "-title")}[:h3 (-> input name string/capitalize)]
+        ^{:key (str input "-input")}[:input {:type type :name input
+          :on-change (fn [e]
+            (rf/dispatch [:update-new (conj path-vec input) (some-> e .-target .-value)]))
+          }]])
 
     [:section.submit-area
       [:input (cond->
@@ -150,13 +137,8 @@
         {:type :button :value "Discard Item"
       :on-click (fn [_]
         (rf/dispatch [:common/navigate! (keyword (:current-page path-params))])
-        ) }
-        ]
-    ]
-    ]
-    )
-  ]
-  )
+        )}]
+    ]])])
 
 (defn page []
   (if-let [page @(rf/subscribe [:common/page])]
