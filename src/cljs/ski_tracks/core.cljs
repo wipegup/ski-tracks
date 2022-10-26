@@ -19,6 +19,47 @@
    {:href   uri
     :class (when (= page @(rf/subscribe [:common/page-id])) :is-active)}
    title])
+   (defn select-buttons [item-path item-info redirect]
+     [:section.button-area
+     ( for [[opt-key opt-info] (:options item-info)]
+     ^{:key (str item-path "-" opt-key)}[:input
+               { :type "button"
+                 :value (:name opt-info)
+                 :style {:color "white"
+                   :background-color (if (:selected opt-info) "green" "red")}
+                 :on-click (fn [_] (rf/dispatch [
+                   (if (= (:type item-info) "multiselect") :toggle-multi-select :toggle-single-select) item-path opt-key]))
+       }]
+   )
+   ^{:key (str item-path "-add")}[:input {
+     :type "button" :value (str "Add " (:name item-info))
+     :on-click (fn [_]
+       (rf/dispatch [:common/navigate! :add-item {:type (string/join "/" (map name item-path)) :key (random-uuid)} redirect])
+       )
+     }]
+     ]
+     )
+
+   (defn non-button-select [item-path item-info info]
+     ^{:key (str item-path "-input")}[:input {
+       :type (:type item-info)
+       :on-change (fn [e] (rf/dispatch [:add-entry-db-info item-path (some-> e .-target .-value)]) )
+       :value (get-in info (conj (vec item-path) :selected))
+     }]
+     )
+
+   (defn select-area
+     ([iterable redirect] (select-area iterable redirect []))
+     ([iterable redirect path-prefix]
+       (for [[item-key item-info] iterable]
+         (let [item-path (conj path-prefix item-key)]
+         ^{:key (str item-key "-section")}[:section.select-area
+           ^{:key (str item-key "-header")}[:h2 (str (:name item-info) " Select")]
+           (if (string/includes? (:type item-info) "select")
+               (select-buttons item-path item-info redirect)
+               (non-button-select item-path item-info iterable)
+             )]
+       ))))
 
 (defn navbar []
   (r/with-let [expanded? (r/atom false)]
@@ -49,35 +90,18 @@
     skier-id (keyword (:skier-id path-params))
     skier-info @(rf/subscribe [:skier-info skier-id])
     path-to-attributes [:entry-info :people :options skier-id :attributes]
+    valid-selections? @(rf/subscribe [:valid-skier-selections? skier-id])
   ]
   [:section
     [:h1 "Gear Selection for " (:name skier-info)]
-    (for [[item-key item-info] (:attributes skier-info)]
-    (let [path-to-items (conj path-to-attributes item-key)]
-    ^{:key (str item-key "-section")}[:section.select-area
-      ^{:key (str item-key "-header")}[:h2 (str (:name item-info) " Select")]
-      [:section.button-area
-        ( for [[opt-key opt-info] (:options item-info)]
-        ^{:key (str item-key "-" opt-key)}[:input
-                  { :type "button"
-                    :value (:name opt-info)
-                    :style {:color "white"
-                      :background-color (if (:selected opt-info) "green" "red")}
-                    :on-click (fn [_] (rf/dispatch [
-                      (if (= (:type item-info) "multiselect") :toggle-multi-select :toggle-single-select) path-to-items opt-key]))
-          }]
-      )
-      ^{:key (str item-key "-add")}[:input {
-        :type "button" :value (str "Add " (:name item-info))
-        :on-click (fn [_]
-          (rf/dispatch [:common/navigate! :add-item {:type (string/join "/" (map name path-to-items)) :key (random-uuid)} {:url-key :skier-gear :params {:skier-id skier-id}}])
-          )
-        }]
 
-      ]
-      ]
-    ))
+    (select-area (:attributes skier-info) {:url-key :skier-gear :params {:skier-id skier-id}} path-to-attributes)
     [:h2 "Add Item Type"]
+    [:input {:type :button :value "Return to Skier Select"
+    :on-click (fn [_] (rf/dispatch [:common/navigate! :skier-select]))
+    :style {:color "white"
+      :background-color (if valid-selections? "green" "red")}
+    }]
   ]
   )
    ])
@@ -88,12 +112,30 @@
     skiers @(rf/subscribe [:active-skiers])
   ]
    [:h1 "You gott here"]
+   [:section
    (for [[key info] skiers]
      ^{:key (str (:name info) "-section")}[:section
      ^{:key (str (:name info) "-select")}[:input {:type :button :value (:name info)
-       :on-click (fn [_] (rf/dispatch [:common/navigate! :skier-gear {:skier-id key}]))}]
-     ]))
+       :on-click (fn [_] (rf/dispatch [:common/navigate! :skier-gear {:skier-id key}]))
+       :style {:color "white"
+         :background-color (if @(rf/subscribe [:valid-skier-selections? key]) "green" "red")}
+       }]
+     ])
+     [:input (cond-> {:type :button :value "Continue to Runs"
+     :on-click (fn [_] (rf/dispatch [:common/navigate! :run-select]))
+     }
+     (not @(rf/subscribe [:active-skier-valid-selections?])) (assoc :disabled "disabled")
+     )]
+       ]
+     )
    ])
+
+(defn run-select-page []
+  [:section
+
+  [:h1 "YEa"]]
+  )
+
 
 (defn entry-page []
   (let [
@@ -102,45 +144,14 @@
     ]
   [:section.section>div.container>div.content
    [:h1 "Entry Start"]
-
-    (for [[item-key item-info] info]
-      ^{:key (str item-key "-section")}[:section.select-area
-        ^{:key (str item-key "-header")}[:h2 (str (:name item-info) " Select")]
-        (if (string/includes? (:type item-info) "select")
-          [:section.button-area
-
-            ( for [[opt-key opt-info] (:options item-info)]
-            ^{:key (str item-key "-" opt-key)}[:input
-                      { :type "button"
-                        :value (:name opt-info)
-                        :style {:color "white"
-                          :background-color (if (:selected opt-info) "green" "red")}
-                        :on-click (fn [_] (rf/dispatch [
-                          (if (= (:type item-info) "multiselect") :toggle-multi-select :toggle-single-select) item-key opt-key]))
-              }]
-          )
-          ^{:key (str item-key "-add")}[:input {
-            :type "button" :value (str "Add " (:name item-info))
-            :on-click (fn [_]
-              (rf/dispatch [:common/navigate! :add-item {:type item-key :key (random-uuid)} {:url-key :entry}])
-              )
-            }]
-          ]
-
-          ^{:key (str item-key "-input")}[:input {
-            :type (:type item-info)
-            :on-change (fn [e] (rf/dispatch [:add-entry-db-info item-key (some-> e .-target .-value)]) )
-            :value (-> info item-key :selected)
-          }])
-      ]
-    )
-    [:section.submit-area [:input (cond->
-      {:type "button" :value "Start Entry"
-    :on-click (fn [_]
-      (rf/dispatch [:common/navigate! :skier-select])
-      ) }
-      (not complete) (assoc :disabled "disabled")
-      )]]]))
+    (select-area info {:url-key :entry})
+    [:section.submit-area
+      [:input (cond->
+        {:type "button" :value "Start Entry"
+          :on-click (fn [_]
+        (rf/dispatch [:common/navigate! :skier-select])
+        )}
+        (not complete) (assoc :disabled "disabled"))]]]))
 
 (defn home-page []
   [:section.section>div.container>div.content
@@ -216,6 +227,8 @@
            :controllers [{:start (fn [_] (rf/dispatch [:page/init-home]))}]}]
      ["/about" {:name :about
                 :view #'about-page}]
+     ["/run-select" {:name :run-select
+                :view #'run-select-page}]
       ["/entry" {:name :entry
                 :view #'entry-page
                 :controllers [{:start (fn [_] (rf/dispatch [:get-entry-info]))}]}]

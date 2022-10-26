@@ -286,6 +286,23 @@
   :<- [:skiers]
   (fn [skiers [_ skier-id]]
     (skier-id skiers)))
+
+(rf/reg-sub
+  :valid-skier-selections?
+  :<- [:skiers]
+  (fn [skiers [_ skier-id]]
+    (all-valid? (-> skiers skier-id :attributes))
+    )
+)
+
+(rf/reg-sub
+  :active-skier-valid-selections?
+  :<- [:active-skiers]
+  (fn [skiers _]
+    (not (some false? (map (fn [[_ v]] (all-valid? (v :attributes))) skiers)))
+    )
+  )
+
 (rf/reg-sub
   :item-info
   (fn [db [_ path]]
