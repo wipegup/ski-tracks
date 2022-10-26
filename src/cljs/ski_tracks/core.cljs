@@ -19,26 +19,41 @@
    {:href   uri
     :class (when (= page @(rf/subscribe [:common/page-id])) :is-active)}
    title])
-   (defn select-buttons [item-path item-info redirect]
-     [:section.button-area
-     ( for [[opt-key opt-info] (:options item-info)]
-     ^{:key (str item-path "-" opt-key)}[:input
-               { :type "button"
-                 :value (:name opt-info)
-                 :style {:color "white"
-                   :background-color (if (:selected opt-info) "green" "red")}
-                 :on-click (fn [_] (rf/dispatch [
-                   (if (= (:type item-info) "multiselect") :toggle-multi-select :toggle-single-select) item-path opt-key]))
-       }]
-   )
-   ^{:key (str item-path "-add")}[:input {
-     :type "button" :value (str "Add " (:name item-info))
-     :on-click (fn [_]
-       (rf/dispatch [:common/navigate! :add-item {:type (string/join "/" (map name item-path)) :key (random-uuid)} redirect])
-       )
-     }]
-     ]
-     )
+
+(defn rf-dp-fn [& args]
+  (let [args (if (sequential? (first args)) (first args) args)]
+  (fn [_]
+    (rf/dispatch (vec args))
+  )))
+
+(defn on-click-nav [& args]
+  (rf-dp-fn (vec (cons :common/navigate! args))))
+
+(defn toggle-button [value toggle on-click key]
+  ^{:key key}[:input {:type :button :value value
+    :style {:color "white"
+      :background-color (if toggle "green" "red")}
+    :on-click on-click}])
+
+(defn disable-button [value toggle on-click]
+  [:input (cond->
+    {:type :button :value value
+    :on-click on-click}
+    toggle (assoc :disabled "disabled")
+  )])
+
+ (defn select-buttons [item-path item-info redirect]
+   [:section.button-area
+   ( for [[opt-key opt-info] (:options item-info)]
+   (toggle-button
+    (:name opt-info)
+    (:selected opt-info)
+    (rf-dp-fn (if (= (:type item-info) "multiselect") :toggle-multi-select :toggle-single-select) item-path opt-key)
+    (str item-path "-" opt-key)))
+ ^{:key (str item-path "-add")}[:input {
+   :type "button" :value (str "Add " (:name item-info))
+   :on-click (on-click-nav :add-item {:type (string/join "/" (map name item-path)) :key (random-uuid)} redirect)
+     }]])
 
    (defn non-button-select [item-path item-info info]
      ^{:key (str item-path "-input")}[:input {
@@ -97,11 +112,7 @@
 
     (select-area (:attributes skier-info) {:url-key :skier-gear :params {:skier-id skier-id}} path-to-attributes)
     [:h2 "Add Item Type"]
-    [:input {:type :button :value "Return to Skier Select"
-    :on-click (fn [_] (rf/dispatch [:common/navigate! :skier-select]))
-    :style {:color "white"
-      :background-color (if valid-selections? "green" "red")}
-    }]
+    (toggle-button "Return to Skier Select" valid-selections? (on-click-nav :skier-select) "ret")
   ]
   )
    ])
@@ -110,32 +121,27 @@
   [:section.section>div.container>div.content
   (let [
     skiers @(rf/subscribe [:active-skiers])
+    all-valid? (not @(rf/subscribe [:active-skier-valid-selections?]))
   ]
    [:h1 "You gott here"]
    [:section
    (for [[key info] skiers]
      ^{:key (str (:name info) "-section")}[:section
-     ^{:key (str (:name info) "-select")}[:input {:type :button :value (:name info)
-       :on-click (fn [_] (rf/dispatch [:common/navigate! :skier-gear {:skier-id key}]))
-       :style {:color "white"
-         :background-color (if @(rf/subscribe [:valid-skier-selections? key]) "green" "red")}
-       }]
+      (toggle-button
+        (:name info)
+        @(rf/subscribe [:valid-skier-selections? key])
+        (on-click-nav :skier-gear {:skier-id key})
+        (str (:name info) "-select")
+        )
      ])
-     [:input (cond-> {:type :button :value "Continue to Runs"
-     :on-click (fn [_] (rf/dispatch [:common/navigate! :run-select]))
-     }
-     (not @(rf/subscribe [:active-skier-valid-selections?])) (assoc :disabled "disabled")
-     )]
+     (disable-button "Continue to Runs" all-valid? (on-click-nav :run-select))
        ]
-     )
-   ])
+     )])
 
 (defn run-select-page []
   [:section
-
   [:h1 "YEa"]]
   )
-
 
 (defn entry-page []
   (let [
@@ -146,12 +152,8 @@
    [:h1 "Entry Start"]
     (select-area info {:url-key :entry})
     [:section.submit-area
-      [:input (cond->
-        {:type "button" :value "Start Entry"
-          :on-click (fn [_]
-        (rf/dispatch [:common/navigate! :skier-select])
-        )}
-        (not complete) (assoc :disabled "disabled"))]]]))
+      (disable-button "Start Entry" (not complete) (on-click-nav :skier-select))
+        ]]))
 
 (defn home-page []
   [:section.section>div.container>div.content
@@ -159,8 +161,7 @@
      [:div {:dangerouslySetInnerHTML {:__html (md->html docs)}}])])
 
  (defn need-vert? [path-seq]
-   (some #{:hike :lift} path-seq )
-   )
+   (some #{:hike :lift} path-seq ))
 
 (defn string-to-map [s]
   (into {}(vec (map vec (partition 2 (map keyword (-> s (string/replace  #"[{}:]" "") (string/split #" ")) ))))))
@@ -197,18 +198,11 @@
           }]])
 
     [:section.submit-area
-      [:input (cond->
-        {:type :button :value "Save Item"
-      :on-click (fn [_]
-        (rf/dispatch [:save-new path-vec cljs-query-params])
-        ) }
-        (not complete) (assoc :disabled "disabled")
-        )]
+      (disable-button "Save Item" (not complete)
+        (rf-dp-fn :save-new path-vec cljs-query-params))
       [:input
         {:type :button :value "Discard Item"
-      :on-click (fn [_]
-        (rf/dispatch [:common/navigate! (:url-key cljs-query-params) (:params cljs-query-params) (:query cljs-query-params)])
-        )}]
+      :on-click (on-click-nav (:url-key cljs-query-params) (:params cljs-query-params) (:query cljs-query-params))}]
     ]])])
 
 (defn page []
@@ -224,14 +218,14 @@
   (reitit/router
     [["/" {:name        :home
            :view        #'home-page
-           :controllers [{:start (fn [_] (rf/dispatch [:page/init-home]))}]}]
+           :controllers [{:start (rf-dp-fn :page/init-home)}]}]
      ["/about" {:name :about
                 :view #'about-page}]
      ["/run-select" {:name :run-select
                 :view #'run-select-page}]
       ["/entry" {:name :entry
                 :view #'entry-page
-                :controllers [{:start (fn [_] (rf/dispatch [:get-entry-info]))}]}]
+                :controllers [{:start (rf-dp-fn :get-entry-info)}]}]
       ["/skier-gear/:skier-id" {:name :skier-gear
                       :view #'skier-gear-page
                       }]
