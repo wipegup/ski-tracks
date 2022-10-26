@@ -163,6 +163,9 @@
 (def simple-blank
   {:name "" :description "" :selected false :attributes {}})
 
+(def type-blank
+  {:type "" :required true :name "" :options {} :valid? false})
+
 (rf/reg-event-db
   :add-new-blank-opt
   (fn [db [_ type uuid]]
@@ -173,6 +176,23 @@
       ]
     (assoc-in with-path path simple-blank)
     )))
+
+(rf/reg-event-db
+  :add-new-blank
+  (fn [db [_ type uuid blank-type]]
+    (let [
+      init-path (get-keyword-path type)
+      path (extend-path init-path (keyword uuid))
+      with-path (assoc-in db [:common/route :path-params :path-vec] path)
+      ]
+    (assoc-in with-path path (if (= blank-type :type) type-blank simple-blank))
+    )
+    )
+  )
+(rf/reg-event-db
+  :add-new-blank-type
+  (fn [])
+  )
 
 (defn need-vert? [path-seq]
   (some #{:hike :lift} path-seq))
@@ -196,6 +216,28 @@
         }
         {:db (update-in db (pop path) dissoc (peek path))}
       ))))
+
+
+(defn complete-new-type? [db seq-path]
+  (let [item (get-in db seq-path)]
+    (and (not= "" (:name item)) (not= "" (:type item)))))
+
+(rf/reg-event-fx
+  :save-or-discard-type
+  (fn [{:keys [db] :as cofx} [_ type uuid]]
+    (let [
+      init-path (get-keyword-path type)
+      path (extend-path init-path (keyword uuid))
+      entry (get-in db path)]
+      (if (and (:saved entry) (complete-new-type? db path))
+        (let [tog (update-in db path dissoc :saved)]
+        {:db (assoc-in db (conj path :valid?) (not (get-in db (conj path :required))))
+          ; :fx [[:dispatch [:update-data path]]]
+        })
+        {:db (update-in db (pop path) dissoc (peek path))}
+      )))
+  )
+
 
 (rf/reg-event-db
   :update-new
@@ -312,6 +354,11 @@
   :complete-new-item?
   (fn [db [_ seq-path]]
     (complete-new-item? db seq-path)))
+
+(rf/reg-sub
+  :complete-new-type?
+  (fn [db [_ seq-path]]
+    (complete-new-type? db seq-path)))
 
 (rf/reg-sub
   :common/error

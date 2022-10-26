@@ -15,7 +15,7 @@
         "name": "Laura",
         "description": "",
         "attributes": {
-          "jackets": {
+          "5d44dfe1-f22a-41c7-8e5f-eed8b90b45be": {
             "type": "multiselect",
             "required":true,
             "name": "Jackets",
@@ -38,7 +38,7 @@
               }
             }
           },
-          "skis": {
+          "11d1ae1c-3ebe-4a54-925c-286ebbad689c": {
             "type": "singleselect",
             "required":true,
             "name": "Skis",
@@ -59,7 +59,7 @@
         "name": "William",
         "description": "",
         "attributes": {
-          "jackets": {
+          "5aab8f85-0b4f-4e58-8460-01b1de9d9b2f": {
             "type": "multiselect",
             "required":true,
             "name": "Jackets",
@@ -78,7 +78,7 @@
               }
             }
           },
-          "skis": {
+          "65dbb83a-2f8d-41f6-b6c4-215af30f7036": {
             "type": "singleselect",
             "required":true,
             "name": "Skis",
@@ -109,7 +109,57 @@
     "options": {
       "b0c38ab8-47a9-4ca1-b8cd-4ceaffe67d95": {
         "name": "Winter Park",
-        "description": ""
+        "description": "",
+        "attributes":{
+          "hike":{
+            "options":{
+              "53ef7925-321a-4baa-a676-eea6bc61ccc8":{
+                "name": "Sunspot",
+                "description": "",
+                "vert": 1600
+              },
+              "20ca9bc1-d93c-4e00-aa39-18ecd1849b5d":{
+                "name": "Prospector",
+                "description": "",
+                "vert": 1100
+              }
+            }
+          },
+          "lift":{
+            "options":{
+              "b1baba84-af00-4cca-bbfd-f58a886879c8":{
+                "name": "Gemini",
+                "description": "",
+                "vert": 450
+              },
+              "d86275d6-d177-46fe-975d-3f97dd00bfba":{
+                "name": "Explorer",
+                "description": "",
+                "vert": 1260
+              }
+            }
+          },
+          "ski":{
+            "options":{
+              "21d5411b-0209-4bc7-bdb4-8c4b1dd50d27":{
+                "name": "Cranmer",
+                "description": ""
+              },
+              "b42b05e4-03bd-4036-b3f5-769d915da296":{
+                "name": "Lo Pa",
+                "description": ""
+              },
+              "dce0c685-97d4-4907-9e52-9cbbb4c42535":{
+                "name": "Rettas",
+                "description": ""
+              },
+              "d4a665b0-8423-4180-b0ad-e88fe12ec8b5":{
+                "name": "Jack Kendrick",
+                "description": ""
+              }
+            }
+          }
+        }
       },
       "70c65f49-54ff-491f-88d6-fc9cd5f7b5c2": {
         "name": "Granby Ranch",

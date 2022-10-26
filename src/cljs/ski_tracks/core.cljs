@@ -106,12 +106,17 @@
     skier-info @(rf/subscribe [:skier-info skier-id])
     path-to-attributes [:entry-info :people :options skier-id :attributes]
     valid-selections? @(rf/subscribe [:valid-skier-selections? skier-id])
+    redirect {:url-key :skier-gear :params {:skier-id skier-id}}
   ]
   [:section
     [:h1 "Gear Selection for " (:name skier-info)]
 
-    (select-area (:attributes skier-info) {:url-key :skier-gear :params {:skier-id skier-id}} path-to-attributes)
-    [:h2 "Add Item Type"]
+    (select-area (:attributes skier-info) redirect path-to-attributes)
+
+    [:section [:input {:type :button :value "Add Item Type"
+    :on-click (on-click-nav :add-item-type {:type (string/join "/" (map name path-to-attributes)) :key (random-uuid)} redirect)
+    }]]
+
     (toggle-button "Return to Skier Select" valid-selections? (on-click-nav :skier-select) "ret")
   ]
   )
@@ -165,6 +170,60 @@
 
 (defn string-to-map [s]
   (into {}(vec (map vec (partition 2 (map keyword (-> s (string/replace  #"[{}:]" "") (string/split #" ")) ))))))
+
+(defn add-item-type-page []
+  [:section.section>div.container>div.content
+  (let [
+      path-params @(rf/subscribe [:path-params])
+      query-params @(rf/subscribe [:query-params])
+      cljs-query-params
+      (cond-> {
+          :url-key (keyword (:url-key query-params))
+        }
+        (:params query-params) (assoc :params  ( string-to-map (:params query-params)))
+        (:query query-params) (assoc :query (string-to-map (:query query-params)))
+      )
+
+      path-vec (:path-vec path-params)
+      parent-info @(rf/subscribe [:parent-info path-vec])
+      item-info @(rf/subscribe [:item-info path-vec])
+      complete @(rf/subscribe [:complete-new-type? path-vec])
+      ]
+      [:section
+      [:section.name
+        [:h3 "Name"]
+        [:input {:type :text :name :name
+          :on-change (fn [e]
+            (rf/dispatch [:update-new (conj path-vec :name) (some-> e .-target .-value)]))
+          :value (:name item-info)
+            }]
+    ]
+      [:section.type
+        [:h3 "Type"]
+          (toggle-button "Multi-Select" (= (:type item-info) "multiselect")
+            (rf-dp-fn [:update-new (conj path-vec :type) "multiselect"]) "multiselect")
+          (toggle-button "Single-Select" (= (:type item-info) "singleselect")
+            (rf-dp-fn [:update-new (conj path-vec :type) "singleselect"]) "singleselect")
+      ]
+      [:section.required
+        [:h3 "Required?"]
+          (toggle-button "True" (:required item-info)
+            (rf-dp-fn [:update-new (conj path-vec :required) true]) "req-true")
+          (toggle-button "False" (not (:required item-info))
+            (rf-dp-fn [:update-new (conj path-vec :required) false]) "req-false")
+      ]
+      [:section.submit
+        (disable-button "Add Item Type" (not complete)
+        (rf-dp-fn :save-new path-vec cljs-query-params))
+      ]
+      [:section
+      [:h3 (string/join " " (keys item-info))]
+      [:h3 (str complete)]
+      ]
+      ]
+      )
+      ]
+)
 
 (defn add-item-page []
   [:section.section>div.container>div.content
@@ -240,6 +299,18 @@
                                    )
                                 :stop (fn [{:keys [path query]}]
                                   (rf/dispatch [:save-or-discard-opt (:type path) (:key path)])
+                                  )
+                               }]}]
+      ["/add-item-type/:type/:key" {:name :add-item-type
+                               :view #'add-item-type-page
+                               :controllers [{
+                                 :parameters {:path [:type :key] :query [:url-key :params :query]}
+
+                                 :start (fn [{:keys [path]}]
+                                   (rf/dispatch [:add-new-blank (:type path) (:key path) :type])
+                                   )
+                                :stop (fn [{:keys [path query]}]
+                                  (rf/dispatch [:save-or-discard-type (:type path) (:key path)])
                                   )
                                }]}]
                 ]))
