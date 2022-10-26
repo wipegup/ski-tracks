@@ -44,7 +44,56 @@
 
 (defn skier-gear-page [_]
   [:section.section>div.container>div.content
-   [:h1 "You gott here"]])
+  (let [
+    path-params @(rf/subscribe [:path-params])
+    skier-id (keyword (:skier-id path-params))
+    skier-info @(rf/subscribe [:skier-info skier-id])
+    path-to-attributes [:entry-info :people :options skier-id :attributes]
+  ]
+  [:section
+    [:h1 "Gear Selection for " (:name skier-info)]
+    (for [[item-key item-info] (:attributes skier-info)]
+    (let [path-to-items (conj path-to-attributes item-key)]
+    ^{:key (str item-key "-section")}[:section.select-area
+      ^{:key (str item-key "-header")}[:h2 (str (:name item-info) " Select")]
+      [:section.button-area
+        ( for [[opt-key opt-info] (:options item-info)]
+        ^{:key (str item-key "-" opt-key)}[:input
+                  { :type "button"
+                    :value (:name opt-info)
+                    :style {:color "white"
+                      :background-color (if (:selected opt-info) "green" "red")}
+                    :on-click (fn [_] (rf/dispatch [
+                      (if (= (:type item-info) "multiselect") :toggle-multi-select :toggle-single-select) path-to-items opt-key]))
+          }]
+      )
+      ^{:key (str item-key "-add")}[:input {
+        :type "button" :value (str "Add " (:name item-info))
+        :on-click (fn [_]
+          (rf/dispatch [:common/navigate! :add-item {:type (string/join "/" (map name path-to-items)) :key (random-uuid)} {:url-key :skier-gear :params {:skier-id skier-id}}])
+          )
+        }]
+
+      ]
+      ]
+    ))
+    [:h2 "Add Item Type"]
+  ]
+  )
+   ])
+
+(defn skier-select-page [_]
+  [:section.section>div.container>div.content
+  (let [
+    skiers @(rf/subscribe [:active-skiers])
+  ]
+   [:h1 "You gott here"]
+   (for [[key info] skiers]
+     ^{:key (str (:name info) "-section")}[:section
+     ^{:key (str (:name info) "-select")}[:input {:type :button :value (:name info)
+       :on-click (fn [_] (rf/dispatch [:common/navigate! :skier-gear {:skier-id key}]))}]
+     ]))
+   ])
 
 (defn entry-page []
   (let [
@@ -73,11 +122,10 @@
           ^{:key (str item-key "-add")}[:input {
             :type "button" :value (str "Add " (:name item-info))
             :on-click (fn [_]
-              (rf/dispatch [:common/navigate! :add-item {:type item-key :key (random-uuid) :current-page :entry}])
+              (rf/dispatch [:common/navigate! :add-item {:type item-key :key (random-uuid)} {:url-key :entry}])
               )
             }]
           ]
-
 
           ^{:key (str item-key "-input")}[:input {
             :type (:type item-info)
@@ -89,7 +137,7 @@
     [:section.submit-area [:input (cond->
       {:type "button" :value "Start Entry"
     :on-click (fn [_]
-      (rf/dispatch [:common/navigate! :skier-gear])
+      (rf/dispatch [:common/navigate! :skier-select])
       ) }
       (not complete) (assoc :disabled "disabled")
       )]]]))
@@ -103,10 +151,22 @@
    (some #{:hike :lift} path-seq )
    )
 
+(defn string-to-map [s]
+  (into {}(vec (map vec (partition 2 (map keyword (-> s (string/replace  #"[{}:]" "") (string/split #" ")) ))))))
+
 (defn add-item-page []
   [:section.section>div.container>div.content
   (let [
-      path-params @(rf/subscribe [:new-opt-info])
+      path-params @(rf/subscribe [:path-params])
+      query-params @(rf/subscribe [:query-params])
+      cljs-query-params
+      (cond-> {
+          :url-key (keyword (:url-key query-params))
+        }
+        (:params query-params) (assoc :params  ( string-to-map (:params query-params)))
+        (:query query-params) (assoc :query (string-to-map (:query query-params)))
+      )
+
       path-vec (:path-vec path-params)
       parent-info @(rf/subscribe [:parent-info path-vec])
       item-info @(rf/subscribe [:item-info path-vec])
@@ -129,14 +189,14 @@
       [:input (cond->
         {:type :button :value "Save Item"
       :on-click (fn [_]
-        (rf/dispatch [:save-new path-vec (keyword (:current-page path-params))])
+        (rf/dispatch [:save-new path-vec cljs-query-params])
         ) }
         (not complete) (assoc :disabled "disabled")
         )]
       [:input
         {:type :button :value "Discard Item"
       :on-click (fn [_]
-        (rf/dispatch [:common/navigate! (keyword (:current-page path-params))])
+        (rf/dispatch [:common/navigate! (:url-key cljs-query-params) (:params cljs-query-params) (:query cljs-query-params)])
         )}]
     ]])])
 
@@ -159,18 +219,20 @@
       ["/entry" {:name :entry
                 :view #'entry-page
                 :controllers [{:start (fn [_] (rf/dispatch [:get-entry-info]))}]}]
-      ["/skier-gear" {:name :skier-gear
+      ["/skier-gear/:skier-id" {:name :skier-gear
                       :view #'skier-gear-page
                       }]
-      ["/add-item/:current-page/:type/:key" {:name :add-item
+      ["/skier-select" {:name :skier-select :view #'skier-select-page}]
+      ["/add-item/:type/:key" {:name :add-item
                                :view #'add-item-page
                                :controllers [{
-                                 :parameters {:path [:type :key :current-page]}
+                                 :parameters {:path [:type :key] :query [:url-key :params :query]}
+
                                  :start (fn [{:keys [path]}]
                                    (rf/dispatch [:add-new-blank-opt (:type path) (:key path)])
                                    )
-                                :stop (fn [{:keys [path]}]
-                                  (rf/dispatch [:save-or-discard-opt (:type path) (:key path) (:current-page path)])
+                                :stop (fn [{:keys [path query]}]
+                                  (rf/dispatch [:save-or-discard-opt (:type path) (:key path)])
                                   )
                                }]}]
                 ]))

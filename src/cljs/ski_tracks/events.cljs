@@ -206,7 +206,10 @@
   :save-new
   (fn [{:keys [db] :as cofx} [_ path redirect]]
     {:db (assoc-in db (conj path :saved) true)
-     :fx [[:dispatch [:common/navigate! redirect]]]
+     :fx [
+     [:dispatch [:common/navigate! (:url-key redirect) (:params redirect) (:query redirect)]]
+     ]
+     ; :show-alert (string/join " " (read-string (:params redirect)))
     }))
 ;;subscriptions
 
@@ -228,9 +231,14 @@
     (-> route :data :view)))
 
 (rf/reg-sub
-  :new-opt-info
+  :path-params
   :<- [:common/route]
   (fn [route] (-> route :path-params)))
+
+(rf/reg-sub
+  :query-params
+  :<- [:common/route]
+  (fn [route] (-> route :query-params)))
 
 (defn remove-opt-key [path-seq]
   (reverse (rest (rest (reverse path-seq)))))
@@ -261,6 +269,23 @@
     )
   )
 
+(rf/reg-sub
+  :skiers
+  :<- [:entry-info]
+  (fn [info _] (-> info :people :options)))
+
+(rf/reg-sub
+  :active-skiers
+  :<- [:skiers]
+  (fn [skiers]
+    (filter #(-> % second :selected) skiers
+    )))
+
+(rf/reg-sub
+  :skier-info
+  :<- [:skiers]
+  (fn [skiers [_ skier-id]]
+    (skier-id skiers)))
 (rf/reg-sub
   :item-info
   (fn [db [_ path]]
