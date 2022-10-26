@@ -144,8 +144,58 @@
      )])
 
 (defn run-select-page []
-  [:section
-  [:h1 "YEa"]]
+  [:section.section>div.container>div.content
+  (let [
+    run-opts @(rf/subscribe [:resort-runs])
+    runs-entered @(rf/subscribe [:runs-entered])
+    comment @(rf/subscribe [:run-comment])
+    lift-count @(rf/subscribe [:run-count :lift])
+    hike-count @(rf/subscribe [:run-count :hike])
+    ski-count @(rf/subscribe [:run-count :ski])
+    lift-vert @(rf/subscribe [:up-vert :lift])
+    hike-vert @(rf/subscribe [:up-vert :hike])
+
+    ]
+    [:section.show
+    [:h2 "Select Runs"]
+    [:span (str "Lifts " lift-count)]
+    [:span (str "Hikes " hike-count)]
+    [:span (str "Runs " ski-count)]
+    [:span (str "Lift Vert " lift-vert)]
+    [:span (str "Hikes Vert " hike-vert)]
+  [:section.comment
+    [:h3 "Comments"]
+    [:input {:type :text :name :comments
+      :on-change (fn [e]
+        (rf/dispatch [:update-run-comment (some-> e .-target .-value)]))
+      :value comment}]
+  ]
+  [:section.opts
+
+  (for [[type info] run-opts]
+    ^{:key (str type "-section")}[:section.type
+    ^{:key (str type "-header")}[:h2 (-> type name string/capitalize)]
+      (for [[id run-info] (:options info)]
+      ^{:key (str id "-select")}[:input
+      {:type :button :value (:name run-info)
+      :on-click (rf-dp-fn :add-run (merge {:key id :type type :comment comment} (select-keys run-info [:name :vert])))
+
+    }
+      ]
+      )
+    ]
+    )
+    ]
+    [:section.done
+  (for [[num run] runs-entered]
+    ; ^{:key (str (:type run) (:name run) idx "-section-entered")}
+    ^{:key (str (:type run) (:name run) num "-header-entered")}[:div (str (-> run :type name string/capitalize) " " (:name run) " " (:comment run)) ]
+    )
+    [:input {:type :button :value "Delete Last" :on-click (rf-dp-fn :delete-last-run)}]
+    ]
+    ]
+  )
+  ]
   )
 
 (defn entry-page []
@@ -215,15 +265,7 @@
       [:section.submit
         (disable-button "Add Item Type" (not complete)
         (rf-dp-fn :save-new path-vec cljs-query-params))
-      ]
-      [:section
-      [:h3 (string/join " " (keys item-info))]
-      [:h3 (str complete)]
-      ]
-      ]
-      )
-      ]
-)
+      ]])])
 
 (defn add-item-page []
   [:section.section>div.container>div.content
@@ -281,7 +323,8 @@
      ["/about" {:name :about
                 :view #'about-page}]
      ["/run-select" {:name :run-select
-                :view #'run-select-page}]
+                :view #'run-select-page
+                :controllers [{:start (rf-dp-fn :page/init-run-select)}]}]
       ["/entry" {:name :entry
                 :view #'entry-page
                 :controllers [{:start (rf-dp-fn :get-entry-info)}]}]

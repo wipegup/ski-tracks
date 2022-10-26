@@ -76,6 +76,11 @@
   (fn [_ _]
     {:dispatch [:fetch-docs]}))
 
+(rf/reg-event-db
+  :page/init-run-select
+  (fn [db _]
+    (assoc db :run-info {:runs {} :comment "" :run-num 0} )))
+
 (defn root-path [path]
   (let [seq-path (if (sequential? path) path [path])]
   (if (= :entry-info (first seq-path))
@@ -253,6 +258,34 @@
      ]
      ; :show-alert (string/join " " (read-string (:params redirect)))
     }))
+
+(rf/reg-event-db
+  :add-run
+  (fn [db [_ m]]
+    (let [
+      num-path [:run-info :run-num]
+      path  [:run-info :runs (get-in db num-path)]
+      added (assoc-in db path  m)
+      clear-comment (assoc-in added [:run-info :comment] "")
+      ]
+      (assoc-in clear-comment num-path (inc (get-in clear-comment num-path)))
+    )
+    )
+  )
+
+
+(rf/reg-event-db
+  :update-run-comment
+  (fn [db [_ c]]
+    (let [path  [:run-info :comment]]
+      (assoc-in db path c))))
+
+(rf/reg-event-db
+  :delete-last-run
+  (fn [db _]
+    (let [path  [:run-info :runs]]
+      (update-in db path dissoc (apply max (keys (get-in db path)))))
+    ))
 ;;subscriptions
 
 (rf/reg-sub
@@ -299,6 +332,46 @@
   :entry-info
   (fn [db _]
     (:entry-info db)))
+
+
+(rf/reg-sub
+  :resort-runs
+  :<- [:entry-info]
+  (fn [info]
+    (:attributes (second (first (filter #(-> % second :selected) (-> info :resort :options)) )))
+    )
+  )
+
+(rf/reg-sub
+  :run-info
+  (fn [db _] (:run-info db)))
+
+(rf/reg-sub
+  :runs-entered
+  :<- [:run-info]
+  (fn [info]
+    (:runs info)))
+
+(rf/reg-sub
+  :run-comment
+  :<- [:run-info]
+  (fn [info]
+    (:comment info)))
+
+(rf/reg-sub
+  :run-count
+  :<- [:runs-entered]
+  (fn [runs [_ type]]
+    (count (filter #(= type (-> % second :type)) runs))
+  ))
+
+(rf/reg-sub
+  :up-vert
+  :<- [:runs-entered]
+  (fn [runs [_ type]]
+    (apply + (map #(-> % second :vert) (filter #(= type (-> % second :type)) runs)))
+  ))
+
 
 (defn all-valid? [info]
   (not (some false? (map (fn [[_ v]] (v :valid?)) info))))
