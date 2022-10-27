@@ -194,10 +194,6 @@
     )
     )
   )
-(rf/reg-event-db
-  :add-new-blank-type
-  (fn [])
-  )
 
 (defn need-vert? [path-seq]
   (some #{:hike :lift} path-seq))
@@ -279,22 +275,25 @@
   )
 
 (rf/reg-event-db
-  :update-run-comment
-  (fn [db [_ c]]
-    (let [path  [:run-info :comment]]
-      (assoc-in db path c))))
+  :update-run-info
+  (fn [db [_ k v]]
+    (let [path  [:run-info k]]
+      (assoc-in db path v))))
 
-(rf/reg-event-db
-  :update-hike-vert-mod
-  (fn [db [_ c]]
-    (let [path  [:run-info :hike-vert-mod]]
-      (assoc-in db path c))))
+; (rf/reg-event-db
+;   :update-hike-vert-mod
+;   (fn [db [_ c]]
+;     (let [path  [:run-info :hike-vert-mod]]
+;       (assoc-in db path c))))
 
 (rf/reg-event-db
   :delete-last-run
   (fn [db _]
-    (let [path  [:run-info :runs]]
-      (update-in db path dissoc (apply max (keys (get-in db path)))))
+    (let [path  [:run-info :runs]
+        num-path  [:run-info :run-num]
+      del (update-in db path dissoc (apply max (keys (get-in db path))))]
+      (assoc-in del num-path (dec (get-in del num-path)))
+      )
     ))
 ;;subscriptions
 
@@ -319,6 +318,11 @@
   :path-params
   :<- [:common/route]
   (fn [route] (-> route :path-params)))
+
+(rf/reg-sub
+  :get-path-param
+  :<- [:common/route]
+  (fn [route [_ k]] (-> route :path-params k)))
 
 (rf/reg-sub
   :query-params
@@ -354,7 +358,8 @@
 (rf/reg-sub
   :resort-runs
   :<- [:entry-info]
-  (fn [info [_ id]]
+  :<- [:active-resort-id]
+  (fn [[info id] _]
     (-> info :resort :options id :attributes)
     )
   )
@@ -381,11 +386,11 @@
   (fn [info]
     (:hike-vert-mod info)))
 
-(rf/reg-sub
-  :valid-hike-vert-mod
-  :<- [:hike-vert-mod]
-  (fn [vert]
-    (integer? (js/parseInt vert))))
+; (rf/reg-sub
+;   :valid-hike-vert-mod
+;   :<- [:hike-vert-mod]
+;   (fn [vert]
+;     (integer? (js/parseInt vert))))
 
 (rf/reg-sub
   :run-count
@@ -431,21 +436,21 @@
   (fn [skiers [_ skier-id]]
     (skier-id skiers)))
 
-(rf/reg-sub
-  :valid-skier-selections?
-  :<- [:skiers]
-  (fn [skiers [_ skier-id]]
-    (all-valid? (-> skiers skier-id :attributes))
-    )
-)
+; (rf/reg-sub
+;   :valid-skier-selections?
+;   :<- [:skiers]
+;   (fn [skiers [_ skier-id]]
+;     (all-valid? (-> skiers skier-id :attributes))
+;     )
+; )
 
-(rf/reg-sub
-  :active-skier-valid-selections?
-  :<- [:active-skiers]
-  (fn [skiers _]
-    (not (some false? (map (fn [[_ v]] (all-valid? (v :attributes))) skiers)))
-    )
-  )
+; (rf/reg-sub
+;   :active-skier-valid-selections?
+;   :<- [:active-skiers]
+;   (fn [skiers _]
+;     (not (some false? (map (fn [[_ v]] (all-valid? (v :attributes))) skiers)))
+;     )
+;   )
 
 (rf/reg-sub
   :item-info
