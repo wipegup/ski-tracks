@@ -35,12 +35,20 @@
       :background-color (if toggle "green" "red")}
     :on-click on-click}])
 
-(defn disable-button [value toggle on-click]
-  [:input (cond->
-    {:type :button :value value
-    :on-click on-click}
-    toggle (assoc :disabled "disabled")
-  )])
+(defn disable-button
+  ([value toggle on-click]
+    [:input (cond->
+      {:type :button :value value
+      :on-click on-click}
+      toggle (assoc :disabled "disabled")
+    )])
+  ([value toggle on-click key]
+    ^{:key key}[:input (cond->
+      {:type :button :value value
+      :on-click on-click}
+      toggle (assoc :disabled "disabled")
+    )])
+  )
 
  (defn select-buttons [item-path item-info redirect]
    [:section.button-area
@@ -122,6 +130,9 @@
   )
    ])
 
+(defn all-valid? [info]
+ (not (some false? (map (fn [[_ v]] (v :valid?)) info))))
+
 (defn skier-select-page [_]
   [:section.section>div.container>div.content
   (let [
@@ -134,7 +145,12 @@
      ^{:key (str (:name info) "-section")}[:section
       (toggle-button
         (:name info)
-        @(rf/subscribe [:valid-skier-selections? key])
+        (not (some false? (map (fn [[_ v]] (v :valid?))
+        ; (all-valid? WHY DOESN'T THIS WORK?
+        (:attributes info)
+        ; )
+        )))
+
         (on-click-nav :skier-gear {:skier-id key})
         (str (:name info) "-select")
         )
@@ -189,9 +205,7 @@
     ^{:key (str type "-section")}[:section.type
     ^{:key (str type "-header")}[:h2 (-> type name string/capitalize)]
       (for [[id run-info] (:options info)]
-      ^{:key (str id "-select")}[:input
-      {:type :button :value (:name run-info)
-      :on-click (rf-dp-fn :add-run (merge {:key id :type type :comment comment} (select-keys run-info [:name :vert])))}]
+      (disable-button (:name run-info) (not valid-hike-vert-mod) (rf-dp-fn :add-run (merge {:key id :type type :comment comment} (select-keys run-info [:name :vert])))(str id "-select"))
       )
       ^{:key (str type "-add")}[:input
       {:type :button :value (str "Add " (name type))
