@@ -104,8 +104,8 @@
     path-params @(rf/subscribe [:path-params])
     skier-id (keyword (:skier-id path-params))
     skier-info @(rf/subscribe [:skier-info skier-id])
-    path-to-attributes [:entry-info :people :options skier-id :attributes]
     valid-selections? @(rf/subscribe [:valid-skier-selections? skier-id])
+    path-to-attributes [:entry-info :people :options skier-id :attributes]
     redirect {:url-key :skier-gear :params {:skier-id skier-id}}
   ]
   [:section
@@ -146,15 +146,20 @@
 (defn run-select-page []
   [:section.section>div.container>div.content
   (let [
-    run-opts @(rf/subscribe [:resort-runs])
+    resort-id @(rf/subscribe [:active-resort-id])
+    run-opts @(rf/subscribe [:resort-runs resort-id])
     runs-entered @(rf/subscribe [:runs-entered])
     comment @(rf/subscribe [:run-comment])
+    hike-vert-mod @(rf/subscribe [:hike-vert-mod])
+    valid-hike-vert-mod @(rf/subscribe [:valid-hike-vert-mod])
+    valid-hike-mod @(rf/subscribe [:valid-hike-vert-mod])
     lift-count @(rf/subscribe [:run-count :lift])
     hike-count @(rf/subscribe [:run-count :hike])
     ski-count @(rf/subscribe [:run-count :ski])
     lift-vert @(rf/subscribe [:up-vert :lift])
     hike-vert @(rf/subscribe [:up-vert :hike])
-
+    path-to-attributes [:entry-info :resort :options resort-id :attributes]
+    redirect {:url-key :run-select}
     ]
     [:section.show
     [:h2 "Select Runs"]
@@ -170,6 +175,14 @@
         (rf/dispatch [:update-run-comment (some-> e .-target .-value)]))
       :value comment}]
   ]
+  [:section.hike-vert
+        [:h3 "Hike Vert Mod"]
+        [:input {:type :text :name :hike-vert-mod
+                 :on-change (fn [e]
+                             (rf/dispatch [:update-hike-vert-mod  (some-> e .-target .-value)]))
+                 :value hike-vert-mod}]
+
+        (when (not valid-hike-vert-mod) [:p "Mod must be Int"])]
   [:section.opts
 
   (for [[type info] run-opts]
@@ -178,11 +191,14 @@
       (for [[id run-info] (:options info)]
       ^{:key (str id "-select")}[:input
       {:type :button :value (:name run-info)
-      :on-click (rf-dp-fn :add-run (merge {:key id :type type :comment comment} (select-keys run-info [:name :vert])))
-
-    }
-      ]
+      :on-click (rf-dp-fn :add-run (merge {:key id :type type :comment comment} (select-keys run-info [:name :vert])))}]
       )
+      ^{:key (str type "-add")}[:input
+      {:type :button :value (str "Add " (name type))
+      :style {:color "white"
+        :background-color "red"}
+      :on-click (on-click-nav :add-item {:type (string/join "/" (map name (conj path-to-attributes type))) :key (random-uuid)} redirect)
+      }]
     ]
     )
     ]

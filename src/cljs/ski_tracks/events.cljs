@@ -79,7 +79,7 @@
 (rf/reg-event-db
   :page/init-run-select
   (fn [db _]
-    (assoc db :run-info {:runs {} :comment "" :run-num 0} )))
+    (assoc db :run-info {:runs {} :comment "" :run-num 0 :hike-vert-mod "0"} )))
 
 (defn root-path [path]
   (let [seq-path (if (sequential? path) path [path])]
@@ -264,20 +264,30 @@
   (fn [db [_ m]]
     (let [
       num-path [:run-info :run-num]
+      mod-path [:run-info :hike-vert-mod]
       path  [:run-info :runs (get-in db num-path)]
-      added (assoc-in db path  m)
+      added (if (= (:type m) :hike)
+        (assoc-in db path (assoc m :vert (+ (js/parseInt (get-in db mod-path))(:vert m))))
+        (assoc-in db path  m)
+      )
       clear-comment (assoc-in added [:run-info :comment] "")
+      clear-hike-mod (assoc-in clear-comment [:run-info :hike-vert-mod] "0")
       ]
-      (assoc-in clear-comment num-path (inc (get-in clear-comment num-path)))
+      (assoc-in clear-hike-mod num-path (inc (get-in clear-hike-mod num-path)))
     )
     )
   )
-
 
 (rf/reg-event-db
   :update-run-comment
   (fn [db [_ c]]
     (let [path  [:run-info :comment]]
+      (assoc-in db path c))))
+
+(rf/reg-event-db
+  :update-hike-vert-mod
+  (fn [db [_ c]]
+    (let [path  [:run-info :hike-vert-mod]]
       (assoc-in db path c))))
 
 (rf/reg-event-db
@@ -333,12 +343,19 @@
   (fn [db _]
     (:entry-info db)))
 
+(rf/reg-sub
+  :active-resort-id
+  :<- [:entry-info]
+  (fn [info]
+    (ffirst (filter #(-> % second :selected) (-> info :resort :options)) )
+    )
+  )
 
 (rf/reg-sub
   :resort-runs
   :<- [:entry-info]
-  (fn [info]
-    (:attributes (second (first (filter #(-> % second :selected) (-> info :resort :options)) )))
+  (fn [info [_ id]]
+    (-> info :resort :options id :attributes)
     )
   )
 
@@ -357,6 +374,18 @@
   :<- [:run-info]
   (fn [info]
     (:comment info)))
+
+(rf/reg-sub
+  :hike-vert-mod
+  :<- [:run-info]
+  (fn [info]
+    (:hike-vert-mod info)))
+
+(rf/reg-sub
+  :valid-hike-vert-mod
+  :<- [:hike-vert-mod]
+  (fn [vert]
+    (integer? (js/parseInt vert))))
 
 (rf/reg-sub
   :run-count
