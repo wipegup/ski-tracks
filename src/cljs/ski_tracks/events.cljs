@@ -31,25 +31,10 @@
  (fn [message]
    (js/alert (str "I was asked to print this: " message))))
 
-
-(rf/reg-event-db
-  :set-docs
-  (fn [db [_ docs]]
-    (assoc db :docs docs)))
-
-(rf/reg-event-fx
-  :fetch-docs
-  (fn [_ _]
-    {:http-xhrio {:method          :get
-                  :uri             "/docs"
-                  :response-format (ajax/raw-response-format)
-                  :on-success       [:set-docs]}}))
-
 (rf/reg-event-db
   :set-entry-info
   (fn [db [_ info]]
-    (assoc db :entry-info info))
-)
+    (assoc db :entry-info info)))
 
 (rf/reg-event-db
   :set-bad-entry-info
@@ -71,15 +56,13 @@
   (fn [db [_ error]]
     (assoc db :common/error error)))
 
-(rf/reg-event-fx
-  :page/init-home
-  (fn [_ _]
-    {:dispatch [:fetch-docs]}))
+(def run-blank {:runs {} :comment "" :run-num 0 :hike-vert-mod "0"})
 
 (rf/reg-event-db
   :page/init-run-select
   (fn [db _]
-    (assoc db :run-info {:runs {} :comment "" :run-num 0 :hike-vert-mod "0"} )))
+    (when (-> db :run-info not) (assoc db :run-info run-blank ))))
+
 
 (defn root-path [path]
   (let [seq-path (if (sequential? path) path [path])]
@@ -102,8 +85,14 @@
 (defn options-path [path]
   (extend-path path :options))
 
+(defn attributes-path [path]
+  (extend-path path :options))
+
 (defn selected-option-path [path key]
   (extend-path (options-path path) key))
+
+(defn selected-attributes-path [path key]
+  (extend-path (attributes-path path) key))
 
 (defn required-path [path]
   (extend-path path :required))
@@ -140,8 +129,7 @@
           [k (if (= k toggle_key)
                 (assoc v :selected (-> v :selected not))
                 (assoc v :selected false)
-          )]
-          )
+          )])
           (get-in db options-path)
         )))
         ]
@@ -163,97 +151,54 @@
 ; "resort/options/b0c38ab8-47a9-4ca1-b8cd-4ceaffe67d95/attributes/hike"
 
 (defn get-keyword-path [path-string]
-  (vec (root-path (map #(keyword %) (string/split path-string #"/")))))
+  (vec (map #(keyword %) (string/split path-string #"/"))))
 
-(def simple-blank
+(def option-blank
   {:name "" :description "" :selected false :attributes {}})
 
-(def type-blank
+(def attribute-blank
   {:type "" :required true :name "" :options {} :valid? false})
+
+(defn get-new-blank [kind]
+  (condp = kind
+    :option option-blank
+    :attribute attribute-blank))
 
 (rf/reg-event-db
   :add-new-blank-opt
-  (fn [db [_ type uuid]]
+  (fn [db [_ type]]
     (let [
-      init-path (get-keyword-path type)
-      path (selected-option-path init-path (keyword uuid))
-      with-path (assoc-in db [:common/route :path-params :path-vec] path)
-      ]
-    (assoc-in with-path path simple-blank)
-    )))
-
-(rf/reg-event-db
-  :add-new-blank
-  (fn [db [_ type uuid blank-type]]
-    (let [
-      init-path (get-keyword-path type)
-      path (extend-path init-path (keyword uuid))
-      with-path (assoc-in db [:common/route :path-params :path-vec] path)
-      ]
-    (assoc-in with-path path (if (= blank-type :type) type-blank simple-blank))
-    )
-    )
-  )
+      path (get-keyword-path type)
+      kind (if (get-in db (conj path :attributes)) :attribute :option)]
+    (assoc-in db [:new-entry] (merge
+      (get-new-blank kind)
+      {:path path :kind kind})))))
 
 (defn need-vert? [path-seq]
   (some #{:hike :lift} path-seq))
 
-(defn complete-new-item? [db seq-path]
-  (let [item (get-in db seq-path)]
-    (if (need-vert? seq-path)
-    (and (< 0 (:vert item)) (not= "" (:name item)))
-    (not= "" (:name item)))))
-
-(rf/reg-event-fx
-  :save-or-discard-opt
-  (fn [{:keys [db] :as cofx} [_ type uuid]]
-    (let [
-      init-path (get-keyword-path type)
-      path (selected-option-path init-path (keyword uuid))
-      entry (get-in db path)]
-      (if (and (:saved entry) (complete-new-item? db path))
-        {:db (update-in db path dissoc :saved)
-          ; :fx [[:dispatch [:update-data path]]]
-        }
-        {:db (update-in db (pop path) dissoc (peek path))}
-      ))))
-
-
-(defn complete-new-type? [db seq-path]
-  (let [item (get-in db seq-path)]
-    (and (not= "" (:name item)) (not= "" (:type item)))))
-
-(rf/reg-event-fx
-  :save-or-discard-type
-  (fn [{:keys [db] :as cofx} [_ type uuid]]
-    (let [
-      init-path (get-keyword-path type)
-      path (extend-path init-path (keyword uuid))
-      entry (get-in db path)]
-      (if (and (:saved entry) (complete-new-type? db path))
-        (let [tog (update-in db path dissoc :saved)]
-        {:db (assoc-in db (conj path :valid?) (not (get-in db (conj path :required))))
-          ; :fx [[:dispatch [:update-data path]]]
-        })
-        {:db (update-in db (pop path) dissoc (peek path))}
-      )))
-  )
+(rf/reg-event-db
+  :discard-new
+  (fn [db _] (dissoc db :new-entry)))
 
 
 (rf/reg-event-db
   :update-new
-  (fn [db [_ path val]]
-    (assoc-in db path val)))
+  (fn [db [_ k val]]
+    (assoc-in db [:new-entry k] val)))
 
 (rf/reg-event-fx
   :save-new
   (fn [{:keys [db] :as cofx} [_ path redirect]]
-    {:db (assoc-in db (conj path :saved) true)
+    (let [entry (dissoc (:new-entry db) :path :kind)
+          tog (if (contains? entry :required) (assoc entry :valid? (-> entry :required not)) entry)
+          ]
+    {:db (assoc-in db path tog)
      :fx [
      [:dispatch [:common/navigate! (:url-key redirect) (:params redirect) (:query redirect)]]
      ]
      ; :show-alert (string/join " " (read-string (:params redirect)))
-    }))
+    })))
 
 (rf/reg-event-db
   :add-run
@@ -279,12 +224,6 @@
   (fn [db [_ k v]]
     (let [path  [:run-info k]]
       (assoc-in db path v))))
-
-; (rf/reg-event-db
-;   :update-hike-vert-mod
-;   (fn [db [_ c]]
-;     (let [path  [:run-info :hike-vert-mod]]
-;       (assoc-in db path c))))
 
 (rf/reg-event-db
   :delete-last-run
@@ -329,94 +268,35 @@
   :<- [:common/route]
   (fn [route] (-> route :query-params)))
 
-(defn remove-opt-key [path-seq]
-  (reverse (rest (rest (reverse path-seq)))))
-
 (rf/reg-sub
-  :parent-info
-  (fn [db [_ path-to-opt]]
-    (get-in db (remove-opt-key path-to-opt))))
-
-(rf/reg-sub
-  :docs
+  :common/error
   (fn [db _]
-    (:docs db)))
+    (:common/error db)))
+
+(rf/reg-sub
+  :new-entry
+  (fn [db _] (:new-entry db)))
 
 (rf/reg-sub
   :entry-info
-  (fn [db _]
-    (:entry-info db)))
+  (fn [db _] (:entry-info db)))
 
 (rf/reg-sub
   :active-resort-id
   :<- [:entry-info]
   (fn [info]
-    (ffirst (filter #(-> % second :selected) (-> info :resort :options)) )
-    )
-  )
+    (ffirst (filter #(-> % second :selected) (-> info :resort :options)))))
 
 (rf/reg-sub
   :resort-runs
   :<- [:entry-info]
   :<- [:active-resort-id]
   (fn [[info id] _]
-    (-> info :resort :options id :attributes)
-    )
-  )
+    (-> info :resort :options id :attributes)))
 
 (rf/reg-sub
   :run-info
   (fn [db _] (:run-info db)))
-
-(rf/reg-sub
-  :runs-entered
-  :<- [:run-info]
-  (fn [info]
-    (:runs info)))
-
-(rf/reg-sub
-  :run-comment
-  :<- [:run-info]
-  (fn [info]
-    (:comment info)))
-
-(rf/reg-sub
-  :hike-vert-mod
-  :<- [:run-info]
-  (fn [info]
-    (:hike-vert-mod info)))
-
-; (rf/reg-sub
-;   :valid-hike-vert-mod
-;   :<- [:hike-vert-mod]
-;   (fn [vert]
-;     (integer? (js/parseInt vert))))
-
-(rf/reg-sub
-  :run-count
-  :<- [:runs-entered]
-  (fn [runs [_ type]]
-    (count (filter #(= type (-> % second :type)) runs))
-  ))
-
-(rf/reg-sub
-  :up-vert
-  :<- [:runs-entered]
-  (fn [runs [_ type]]
-    (apply + (map #(-> % second :vert) (filter #(= type (-> % second :type)) runs)))
-  ))
-
-
-(defn all-valid? [info]
-  (not (some false? (map (fn [[_ v]] (v :valid?)) info))))
-
-(rf/reg-sub
-  :valid-entry?
-  :<- [:entry-info]
-  (fn [info]
-    (all-valid? info)
-    )
-  )
 
 (rf/reg-sub
   :skiers
@@ -436,38 +316,7 @@
   (fn [skiers [_ skier-id]]
     (skier-id skiers)))
 
-; (rf/reg-sub
-;   :valid-skier-selections?
-;   :<- [:skiers]
-;   (fn [skiers [_ skier-id]]
-;     (all-valid? (-> skiers skier-id :attributes))
-;     )
-; )
-
-; (rf/reg-sub
-;   :active-skier-valid-selections?
-;   :<- [:active-skiers]
-;   (fn [skiers _]
-;     (not (some false? (map (fn [[_ v]] (all-valid? (v :attributes))) skiers)))
-;     )
-;   )
-
 (rf/reg-sub
   :item-info
   (fn [db [_ path]]
     (get-in db path)))
-
-(rf/reg-sub
-  :complete-new-item?
-  (fn [db [_ seq-path]]
-    (complete-new-item? db seq-path)))
-
-(rf/reg-sub
-  :complete-new-type?
-  (fn [db [_ seq-path]]
-    (complete-new-type? db seq-path)))
-
-(rf/reg-sub
-  :common/error
-  (fn [db _]
-    (:common/error db)))

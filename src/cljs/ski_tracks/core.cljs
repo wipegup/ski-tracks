@@ -77,26 +77,25 @@
    :on-click (on-click-nav :add-item {:type (string/join "/" (map name item-path)) :key (random-uuid)} redirect)
      }]])
 
-   (defn non-button-select [item-path item-info info]
-     ^{:key (str item-path "-input")}[:input {
-       :type (:type item-info)
-       :on-change (fn [e] (rf/dispatch [:add-entry-db-info item-path (event-val e)]) )
-       :value (get-in info (conj (vec item-path) :selected))
-     }]
-     )
+(defn non-button-select [item-path item-info info]
+ ^{:key (str item-path "-input")}[:input {
+   :type (:type item-info)
+   :on-change (fn [e] (rf/dispatch [:add-entry-db-info item-path (event-val e)]) )
+   :value (item-info :selected)
+ }])
 
-   (defn select-area
-     ([iterable redirect] (select-area iterable redirect []))
-     ([iterable redirect path-prefix]
-       (for [[item-key item-info] iterable]
-         (let [item-path (conj path-prefix item-key)]
-         ^{:key (str item-key "-section")}[:section.select-area
-           ^{:key (str item-key "-header")}[:h2 (str (:name item-info) " Select")]
-           (if (string/includes? (:type item-info) "select")
-               (select-buttons item-path item-info redirect)
-               (non-button-select item-path item-info iterable)
-             )]
-       ))))
+ (defn select-area
+   ([iterable redirect] (select-area iterable redirect []))
+   ([iterable redirect path-prefix]
+     (for [[item-key item-info] iterable]
+       (let [item-path (conj path-prefix item-key)]
+       ^{:key (str item-key "-section")}[:section.select-area
+         ^{:key (str item-key "-header")}[:h2 (str (:name item-info) " Select")]
+         (if (string/includes? (:type item-info) "select")
+             (select-buttons item-path item-info redirect)
+             (non-button-select item-path item-info iterable)
+           )]
+     ))))
 
 (defn navbar []
   (r/with-let [expanded? (r/atom false)]
@@ -116,6 +115,11 @@
                  [nav-link "#/entry" "Entry" :entry]
                  ]]]))
 
+(defn home-page []
+[:section.section>div.container>div.content
+ [:h1 "Welcome"]
+ (button "Start Entry" (on-click-nav :entry))])
+
 (defn about-page [_]
   [:section.section>div.container>div.content
    [:img {:src "/img/warning_clojure.png"}]])
@@ -126,11 +130,11 @@
 (defn entry-page []
  (let [
    info @(rf/subscribe [:entry-info])
-   complete @(rf/subscribe [:valid-entry?])
+   complete (all-valid? info)
    ]
  [:section.section>div.container>div.content
   [:h1 "Entry Start"]
-   (select-area info {:url-key :entry})
+   (select-area info {:url-key :entry} [:entry-info])
    [:section.submit-area
      (disable-button "Start Entry" (on-click-nav :skier-select) (not complete))
        ]]))
@@ -175,7 +179,7 @@
     ]
     (select-area (:attributes skier-info) redirect path-to-attributes)
     [:section.submit
-      (add-button "Add Item Type" :add-item-type redirect path-to-attributes)
+      (add-button "Add Item Type" :add-item redirect (pop path-to-attributes))
       (toggle-button "Return to Skier Select" (on-click-nav :skier-select) valid-selections? "ret")
     ]]
   )])
@@ -239,7 +243,7 @@
               ^{:key (str (:name run-info) "-Count")}[:span (run-count grouped-runs type [:key id])]]))
 
             (add-button (str "Add " (name type)) :add-item
-              redirect path-to-attributes (str type "-add")
+              redirect (conj path-to-attributes type) (str type "-add")
               {:added-opts {:style {:color "white" :background-color "red"}}})
           ])]]
     [:section.runs-completed
@@ -249,100 +253,73 @@
       [:input {:type :button :value "Delete Last" :on-click (rf-dp-fn :delete-last-run)}]]]
 )])
 
-(defn home-page []
-  [:section.section>div.container>div.content
-   [:h1 "Welcome"]
-   (button "Start Entry" (on-click-nav :entry))])
-
  (defn need-vert? [path-seq]
    (some #{:hike :lift} path-seq ))
 
+(defn is-run? [path-seq]
+ (some #{:hike :lift :ski} path-seq))
+
 (defn string-to-map [s]
-  (into {}(vec (map vec (partition 2 (map keyword (-> s (string/replace  #"[{}:]" "") (string/split #" ")) ))))))
+  (as-> s s
+    (string/replace s #"[{}:]" "") (string/split s #" ") (map keyword s)
+    (partition 2 s) (map vec s) (vec s) (into {} s)))
+
+(defn complete-new-item? [item seq-path]
+    (if (need-vert? seq-path)
+    (and (> (:vert item) 0) (not= "" (:name item)))
+    (not= "" (:name item))))
+
+(defn complete-new-type? [item seq-path]
+  (let [item item]
+    (and (not= "" (:name item)) (not= "" (:type item)))))
+
+(defn complete-new-check [kind]
+  (condp = kind
+    :option complete-new-item?
+    :attribute complete-new-type?
+    #(false)))
 
 (defn add-item-page []
   [:section.section>div.container>div.content
-  (let [
-      {:keys [path-vec]} @(rf/subscribe [:path-params])
-      {:keys [url-key params query]} @(rf/subscribe [:query-params])
-      cljs-query-params (cond-> {:url-key (keyword url-key)}
-        params (assoc :params (string-to-map params))
-        query (assoc :query (string-to-map query)))
-
-      parent-info @(rf/subscribe [:parent-info path-vec])
-      item-info @(rf/subscribe [:item-info path-vec])
-      complete @(rf/subscribe [:complete-new-item? path-vec])
-      inputs (cond-> [[:name :text] [:description :text]]
-               (need-vert? path-vec) (conj [:vert :number]))]
-    [:div
-    [:h2 "New " (parent-info :name)]
-
+  (let [ {:keys [path kind] :as new-info} @(rf/subscribe [:new-entry])
+        parent-info @(rf/subscribe [:item-info path])
+        {:keys [url-key params query]} @(rf/subscribe [:query-params])
+        cljs-query-params (cond-> {:url-key (keyword url-key)}
+          params (assoc :params (string-to-map params))
+          query (assoc :query (string-to-map query)))
+        is-run? (is-run? path)
+        need-vert? (need-vert? path)
+        complete? ((complete-new-check kind) new-info path)
+        inputs (cond-> [[:name :text]]
+                 (= :option kind) (conj [:description :text])
+                 need-vert? (conj [:vert :number])
+                 (= :attribute kind) (concat [[:type ["multiselect" "singleselect"]] [:required [true false]]])
+                 )
+        submit-path (conj path (-> kind name (str "s") keyword) (-> (random-uuid) str keyword))
+  ]
+  [:section.body
+    [:section.title [:h1 (str "New " (parent-info :name) (when (= kind :attribute) " Item Type"))]]
+    [:section.entry
     (for [[input type] inputs]
       ^{:key (str input "-section")}[:section
         ^{:key (str input "-title")}[:h3 (-> input name string/capitalize)]
-        ^{:key (str input "-input")}[:input {:type type :name input
-          :on-change (fn [e]
-            (rf/dispatch [:update-new (conj path-vec input)
-            (cond-> (event-val e)
-            (= type :number) (js/parseInt)
-            )]))
-          }]])
-
+        (if (vector? type)
+          (for [opt type]
+            (toggle-button (-> opt str string/capitalize)
+              (rf-dp-fn [:update-new input opt])
+              (= (input new-info) opt) (str opt "-select")))
+          ^{:key (str input "-input")}[:input {:type type :name input
+            :on-change (fn [e]
+              (rf/dispatch [:update-new input
+                (cond-> (event-val e) (= type :number) (js/parseInt))]))}])])]
     [:section.submit-area
       (disable-button "Save Item"
-        (rf-dp-fn :save-new path-vec cljs-query-params) (not complete))
+        (rf-dp-fn :save-new submit-path cljs-query-params) (not complete?))
       [:input
         {:type :button :value "Discard Item"
-      :on-click (on-click-nav (:url-key cljs-query-params) (:params cljs-query-params) (:query cljs-query-params))}]
-    ]])])
-
-  (defn add-item-type-page []
-    [:section.section>div.container>div.content
-    (let [
-        path-params @(rf/subscribe [:path-params])
-        query-params @(rf/subscribe [:query-params])
-        cljs-query-params
-        (cond-> {
-            :url-key (keyword (:url-key query-params))
-          }
-          (:params query-params) (assoc :params  ( string-to-map (:params query-params)))
-          (:query query-params) (assoc :query (string-to-map (:query query-params)))
-        )
-
-        path-vec (:path-vec path-params)
-        parent-info @(rf/subscribe [:parent-info path-vec])
-        item-info @(rf/subscribe [:item-info path-vec])
-        complete @(rf/subscribe [:complete-new-type? path-vec])
-        ]
-        [:section
-        [:section.name
-          [:h3 "Name"]
-          [:input {:type :text :name :name
-            :on-change (fn [e]
-              (rf/dispatch [:update-new (conj path-vec :name) (event-val e)]))
-            :value (:name item-info)
-              }]
+      :on-click (on-click-nav (:url-key cljs-query-params) (:params cljs-query-params) (:query cljs-query-params))}]]
       ]
-        [:section.type
-          [:h3 "Type"]
-            (toggle-button "Multi-Select"
-              (rf-dp-fn [:update-new (conj path-vec :type) "multiselect"])
-              (= (:type item-info) "multiselect") "multiselect")
-            (toggle-button "Single-Select"
-              (rf-dp-fn [:update-new (conj path-vec :type) "singleselect"])
-              (= (:type item-info) "singleselect") "singleselect")
-        ]
-        [:section.required
-          [:h3 "Required?"]
-            (toggle-button "True"
-              (rf-dp-fn [:update-new (conj path-vec :required) true]) (:required item-info) "req-true")
-            (toggle-button "False"
-              (rf-dp-fn [:update-new (conj path-vec :required) false]) (not (:required item-info)) "req-false")
-        ]
-        [:section.submit
-          (disable-button "Add Item Type"
-          (rf-dp-fn :save-new path-vec cljs-query-params) (not complete))
-        ]])])
+  )])
 
 (defn page []
   (if-let [page @(rf/subscribe [:common/page])]
@@ -356,8 +333,7 @@
 (def router
   (reitit/router
     [["/" {:name        :home
-           :view        #'home-page
-           :controllers [{:start (rf-dp-fn :page/init-home)}]}]
+           :view        #'home-page}]
      ["/about" {:name :about
                 :view #'about-page}]
      ["/run-select" {:name :run-select
@@ -374,25 +350,10 @@
                                :view #'add-item-page
                                :controllers [{
                                  :parameters {:path [:type :key] :query [:url-key :params :query]}
-
                                  :start (fn [{:keys [path]}]
                                    (rf/dispatch [:add-new-blank-opt (:type path) (:key path)])
                                    )
-                                :stop (fn [{:keys [path query]}]
-                                  (rf/dispatch [:save-or-discard-opt (:type path) (:key path)])
-                                  )
-                               }]}]
-      ["/add-item-type/:type/:key" {:name :add-item-type
-                               :view #'add-item-type-page
-                               :controllers [{
-                                 :parameters {:path [:type :key] :query [:url-key :params :query]}
-
-                                 :start (fn [{:keys [path]}]
-                                   (rf/dispatch [:add-new-blank (:type path) (:key path) :type])
-                                   )
-                                :stop (fn [{:keys [path query]}]
-                                  (rf/dispatch [:save-or-discard-type (:type path) (:key path)])
-                                  )
+                                :stop (fn [] (rf/dispatch [:discard-new]))
                                }]}]
                 ]))
 

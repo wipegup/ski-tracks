@@ -112,6 +112,7 @@
         "description": "",
         "attributes":{
           "hike":{
+            "name": "Hike",
             "options":{
               "53ef7925-321a-4baa-a676-eea6bc61ccc8":{
                 "name": "Sunspot",
@@ -126,6 +127,7 @@
             }
           },
           "lift":{
+            "name": "Lift",
             "options":{
               "b1baba84-af00-4cca-bbfd-f58a886879c8":{
                 "name": "Gemini",
@@ -140,6 +142,7 @@
             }
           },
           "ski":{
+            "name": "Ski",
             "options":{
               "21d5411b-0209-4bc7-bdb4-8c4b1dd50d27":{
                 "name": "Cranmer",
