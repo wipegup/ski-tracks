@@ -159,10 +159,13 @@
 (def attribute-blank
   {:type "" :required true :name "" :options {} :valid? false})
 
+(def resort-blank (merge option-blank {:attributes {:hike {:name "Hike" :options {}} :lift {:name "Lift" :options {}} :ski {:name "Ski" :options {}}}}))
+
 (defn get-new-blank [kind]
   (condp = kind
     :option option-blank
-    :attribute attribute-blank))
+    :attribute attribute-blank
+    :resort resort-blank))
 
 (rf/reg-event-db
   :add-new-blank-opt
@@ -171,7 +174,7 @@
       path (get-keyword-path type)
       kind (if (get-in db (conj path :attributes)) :attribute :option)]
     (assoc-in db [:new-entry] (merge
-      (get-new-blank kind)
+      (get-new-blank (if (= (last path) :resort) :resort kind))
       {:path path :kind kind})))))
 
 (defn need-vert? [path-seq]

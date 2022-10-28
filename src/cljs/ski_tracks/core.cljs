@@ -230,7 +230,8 @@
 
         (when (not valid-hike-mod?) [:h4 "Hike Mod must be Int"])
       [:section.run-select
-        (for [[type info] run-opts]
+          (for [type [:hike :lift :ski]]
+            (let [info (type run-opts)]
           ^{:key (str type "-section")}[:section.type
           ^{:key (str type "-header")}[:h3 (-> type name string/capitalize)]
             (for [[id run-info] (:options info)]
@@ -245,7 +246,7 @@
             (add-button (str "Add " (name type)) :add-item
               redirect (conj path-to-attributes type) (str type "-add")
               {:added-opts {:style {:color "white" :background-color "red"}}})
-          ])]]
+          ]))]]
     [:section.runs-completed
       (for [[num run] runs-entered]
         ^{:key (str (:type run) (:name run) num "-header-entered")}[:div
