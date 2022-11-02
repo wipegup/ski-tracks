@@ -5,6 +5,12 @@
     "name": "Date",
     "description": ""
   },
+  "temperature": {
+    "type": "string",
+    "required":true,
+    "name": "Temperature",
+    "description": ""
+  },
   "people": {
     "type": "multiselect",
     "required":true,

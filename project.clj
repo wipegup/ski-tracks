@@ -38,7 +38,8 @@
                  [ring/ring-core "1.9.5"]
                  [ring/ring-defaults "0.3.3"]
                  [selmer "1.12.53"]
-                 [thheller/shadow-cljs "2.19.9" :scope "provided"]]
+                 [thheller/shadow-cljs "2.19.9" :scope "provided"]
+                 [com.taoensso/faraday "1.11.4"]]
 
   :min-lein-version "2.0.0"
 

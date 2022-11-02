@@ -10,7 +10,8 @@
     [ski-tracks.middleware.formats :as formats]
     [ring.util.http-response :refer :all]
     [clojure.java.io :as io]
-    [clojure.data.json :as json]))
+    [clojure.data.json :as json]
+    [taoensso.faraday :as far]))
 
     (defn add-to-arr [h mod-func]
       (into {}
@@ -56,6 +57,27 @@
       (loop-hashes add-selected-func)
       (loop-hashes inner-prepare-func)))
 
+(def ddb-opts
+  {:access-key "fake-access"
+   :secret-key "fake-secret"
+   :endpoint "http://localhost:8000"
+  })
+(def ddb-table :test-ski-tracks)
+
+(defn latest-ddb
+  ([pk] (->
+    (far/query ddb-opts ddb-table
+      {:pk [:eq pk]} {:return [:data] :order :desc :limit 1})
+      (get 0)
+      :data
+      ))
+  ([pk rk-prefix] (->
+    (far/query ddb-opts ddb-table
+      {:pk [:eq pk] :rk [:begins-with (str rk-prefix "-")]} {:return [:data] :order :desc :limit 1})
+      (get 0)
+      :data
+      )))
+
 (defn service-routes []
   ["/api"
    {:coercion spec-coercion/coercion
@@ -94,15 +116,27 @@
    ["/ping"
     {:get (constantly (ok {:message "pong"}))}]
 
+   ; ["/entry-info-old"
+   ;  {:get { :summary "emits static example json"
+   ;          :handler (fn [_]
+   ;            {:status 200
+   ;             :body
+   ;               (-> "public/json/example.json"
+   ;               io/resource
+   ;               slurp
+   ;               (json/read-str :key-fn keyword)
+   ;               prepare-source )
+   ;               })}}]
 
    ["/entry-info"
-    {:get { :summary "emits static example json"
+    {:get { :summary "emits static example from ddb"
             :handler (fn [_]
               {:status 200
                :body
-                 (-> "public/json/example.json"
-                 io/resource
-                 slurp
-                 (json/read-str :key-fn keyword)
+                 (-> (merge
+                   (latest-ddb "context")
+                   {:people (latest-ddb "items" "people")}
+                   {:resort (latest-ddb "items" "resort")})
                  prepare-source )
-                 })}}]])
+                 })}}]
+                 ])
