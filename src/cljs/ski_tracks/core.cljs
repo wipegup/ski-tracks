@@ -251,7 +251,11 @@
       (for [[num run] runs-entered]
         ^{:key (str (:type run) (:name run) num "-header-entered")}[:div
           (str (-> run :type name string/capitalize) " " (:name run) " " (:comment run))])
-      [:input {:type :button :value "Delete Last" :on-click (rf-dp-fn :delete-last-run)}]]]
+      [:input {:type :button :value "Delete Last" :on-click (rf-dp-fn :delete-last-run)}]]
+    [:section.submit
+      (disable-button "Submit Observation" (rf-dp-fn :add-observation) (< (count runs-entered) 2))
+    ]
+      ]
 )])
 
  (defn need-vert? [path-seq]

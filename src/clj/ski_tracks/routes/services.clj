@@ -178,4 +178,17 @@
                 :status (if put 200 400)
                 :body {:status (if put "OK" "NOT SAVED")}
                 }))}}]
+   ["/add-obs"
+    {:post { :summary "Adds obs to ddb"
+            :handler (fn [{{:keys [d]} :body-params}]
+
+              (let [
+                pk "obs"
+                rk (str (ts))
+                put (put-item pk rk (dissoc d :common/route))
+              ]
+              {
+                :status (if put 200 400)
+                :body {:status (if put "OK" "NOT SAVED")}
+                }))}}]
                  ])

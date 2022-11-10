@@ -255,6 +255,42 @@
     )
   )
 
+(rf/reg-event-fx
+  :obs-persist-success
+  (fn [_ _]
+    {
+      ; :show-alert "Ok"
+    }
+    ;; Want to re-structure to: 1. save to ddb 2. save to db 3. (finally) navigate
+    ;; This currently a placeholder
+    ))
+
+  (rf/reg-event-fx
+   :ddb-obs-persist
+   (fn [_ [_ db]]
+     (let [data db
+           ]
+
+     {:http-xhrio {:method          :post
+                   :uri             "/api/add-obs"
+                   :params          {:d data}
+                   :format          (ajax/json-request-format)
+                   :response-format (ajax/json-response-format {:keywords? true})
+                   :on-success       [:obs-persist-success]
+                   :on-failure       [:reject]
+
+                   }}
+     )))
+(rf/reg-event-fx
+  :add-observation
+  (fn [{:keys [db]} _]
+    (let [reset-db (dissoc db :entry-info :run-info)]
+    {
+      :db reset-db
+      :fx [[:dispatch [:ddb-obs-persist (dissoc db :common/route)]]
+      [:dispatch [:common/navigate! :home]]]
+    })))
+
 (rf/reg-event-db
   :update-run-info
   (fn [db [_ k v]]
