@@ -11,7 +11,9 @@
     [ring.util.http-response :refer :all]
     [clojure.java.io :as io]
     [clojure.data.json :as json]
-    [taoensso.faraday :as far]))
+    [taoensso.faraday :as far]
+    [java-time :as jt]
+    [clojure.string :as string]))
 
     (defn add-to-arr [h mod-func]
       (into {}
@@ -78,6 +80,25 @@
       :data
       )))
 
+(defn ts [] (jt/format "yyyy-MM-dd'T'HH:mm:ss.SS" (jt/local-date-time)))
+
+(defn put-item [pk rk data]
+  (let [put-result (try
+    (far/put-item ddb-opts ddb-table {:pk pk :rk rk :data data})
+    (catch Exception e false)
+    )]
+    (nil? put-result)
+    ))
+
+(defn put-generic[pk rk data]
+  (let [put-result (try
+    (far/put-item ddb-opts ddb-table {:pk pk :rk rk :data data})
+    (catch Exception e false)
+    )]
+    (nil? put-result)
+    ))
+
+
 (defn service-routes []
   ["/api"
    {:coercion spec-coercion/coercion
@@ -139,4 +160,22 @@
                    {:resort (latest-ddb "items" "resort")})
                  prepare-source )
                  })}}]
+
+   ["/item-info-update"
+    {:post { :summary "Updates ddb with new info"
+            :handler (fn [{{:keys [k d path]} :body-params}]
+
+              (let [
+                pk "items"
+                path (map keyword path)
+                rk (str k "-" (ts))
+
+                old (latest-ddb pk k)
+                updated (assoc-in old path d)
+                put (put-item pk rk updated)
+              ]
+              {
+                :status (if put 200 400)
+                :body {:status (if put "OK" "NOT SAVED")}
+                }))}}]
                  ])

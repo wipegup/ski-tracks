@@ -278,7 +278,7 @@
   (condp = kind
     :option complete-new-item?
     :attribute complete-new-type?
-    #(false)))
+    (constantly false)))
 
 (defn add-item-page []
   [:section.section>div.container>div.content

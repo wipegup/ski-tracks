@@ -191,6 +191,39 @@
     (assoc-in db [:new-entry k] val)))
 
 (rf/reg-event-fx
+  :db-persist
+  (fn [_ _]
+    {
+      ; :show-alert "Ok"
+    }
+    ;; Want to re-structure to: 1. save to ddb 2. save to db 3. (finally) navigate
+    ;; This currently a placeholder
+    ))
+
+(rf/reg-event-fx
+  :reject
+  (fn [_ _]
+    {:show-alert "NOT SAVED / ERROR"}
+    ))
+
+(rf/reg-event-fx
+ :ddb-persist
+ (fn [_ [_ path data]]
+   (let [item-type  (-> path second name)
+         item-path (nthrest path 2)
+         n (data :name)]
+
+   {:http-xhrio {:method          :post
+                 :uri             "/api/item-info-update"
+                 :params          {:k item-type :d data :path item-path}
+                 :format          (ajax/json-request-format)
+                 :response-format (ajax/json-response-format {:keywords? true})
+                 :on-success       [:db-persist]
+                 :on-failure       [:reject]
+                 }}
+   )))
+
+(rf/reg-event-fx
   :save-new
   (fn [{:keys [db] :as cofx} [_ path redirect]]
     (let [entry (dissoc (:new-entry db) :path :kind)
@@ -198,9 +231,9 @@
           ]
     {:db (assoc-in db path tog)
      :fx [
+     [:dispatch [:ddb-persist path entry]]
      [:dispatch [:common/navigate! (:url-key redirect) (:params redirect) (:query redirect)]]
      ]
-     ; :show-alert (string/join " " (read-string (:params redirect)))
     })))
 
 (rf/reg-event-db

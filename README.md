@@ -46,9 +46,9 @@ data: <map>
    :secret-key "fake-secret"
    :endpoint "http://localhost:8000"
   })
-
+(def ddb-table :test-ski-tracks)
+(far/delete-table ddb-opts test-table)
 (defn ts [] (jt/format "yyyy-MM-dd'T'HH:mm:ss.SS" (jt/local-date-time)))
-(def test-table :test-ski-tracks)
 (far/create-table ddb-opts test-table
   [:pk :s]
   {:range-keydef [:rk :s]
@@ -61,8 +61,13 @@ data: <map>
    slurp
    (json/read-str :key-fn keyword)))
 
-(defn put-item [pk rk data]
-  (far/put-item ddb-opts test-table {:pk pk :rk rk :data data}))
+ (defn put-item [pk rk data]
+   (let [put-result (try
+     (far/put-item ddb-opts ddb-table {:pk pk :rk rk :data data})
+     (catch Exception e false)
+     )]
+     (nil? put-result)
+     ))
 
 ;; Add context to ddb
 (let [pk "context"
@@ -85,7 +90,7 @@ data: <map>
 ;; e.g retrieve latest context
 ;; In lieu of maintaining a "latest" value which tells the specific RK to query
 ;; Not too worried about read/write costs
-; (far/query ddb-opts test-table {:pk [:eq "context"]} {:return [:rk :data] :order :desc :limit 1})
+; (far/query ddb-opts ddb-table {:pk [:eq "context"]} {:return [:rk :data] :order :desc :limit 1})
 ```
 
 
@@ -102,3 +107,5 @@ data: <map>
 
 - Expand hiking input (v2)
 - Display previous observations
+- Sort options
+- Only display (20?) options with rest in drop down
