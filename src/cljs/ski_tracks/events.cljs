@@ -56,7 +56,7 @@
   (fn [db [_ error]]
     (assoc db :common/error error)))
 
-(def run-blank {:runs {} :comment "" :run-num 0 :hike-vert-mod "0"})
+(def run-blank {:runs {} :comment nil :run-num 0 :hike-vert-mod 0})
 
 (rf/reg-event-db
   :page/init-run-select
@@ -247,8 +247,8 @@
         (assoc-in db path (assoc m :vert (+ (js/parseInt (get-in db mod-path))(:vert m))))
         (assoc-in db path  m)
       )
-      clear-comment (assoc-in added [:run-info :comment] "")
-      clear-hike-mod (assoc-in clear-comment [:run-info :hike-vert-mod] "0")
+      clear-comment (assoc-in added [:run-info :comment] nil)
+      clear-hike-mod (assoc-in clear-comment [:run-info :hike-vert-mod] 0)
       ]
       (assoc-in clear-hike-mod num-path (inc (get-in clear-hike-mod num-path)))
     )
@@ -287,8 +287,9 @@
     (let [reset-db (dissoc db :entry-info :run-info)]
     {
       :db reset-db
-      :fx [[:dispatch [:ddb-obs-persist (dissoc db :common/route)]]
-      [:dispatch [:common/navigate! :home]]]
+      :fx [[:dispatch [:common/navigate! :home]]
+      [:dispatch [:ddb-obs-persist (dissoc db :common/route)]]
+      ]
     })))
 
 (rf/reg-event-db
@@ -318,6 +319,12 @@
   :<- [:common/route]
   (fn [route _]
     (-> route :data :name)))
+
+(rf/reg-sub
+  :common/tab-id
+  :<- [:common/page-id]
+  (fn [page-id _]
+    (if (some #{:home :about} [page-id]) page-id :entry)))
 
 (rf/reg-sub
   :common/page

@@ -11,14 +11,9 @@
     [ski-tracks.events]
     [reitit.core :as reitit]
     [reitit.frontend.easy :as rfe]
-    [clojure.string :as string])
+    [clojure.string :as string]
+    [re-com.core :as rc :refer [at]])
   (:import goog.History))
-
-(defn nav-link [uri title page]
-  [:a.navbar-item
-   {:href   uri
-    :class (when (= page @(rf/subscribe [:common/page-id])) :is-active)}
-   title])
 
  (defn event-val [e]
    (some-> e .-target .-value))
@@ -43,6 +38,10 @@
   {:style {:color "white"
     :background-color (if toggle "green" "red")}})
 
+(defn- rc-toggle-style [toggle]
+  {:color "white"
+    :background-color (if toggle "green" "red")})
+
 (defn toggle-button
   ([text on-click tog key] (button text on-click (toggle-opt tog) key))
   ([text on-click tog] (button text on-click (toggle-opt tog))))
@@ -56,7 +55,8 @@
 
  (defn add-button
    [& args]
-   (let [{:keys [added-opts] :or {added-opts {}}} (if (-> args last map?) (last args) {})
+   (let [{:keys [added-opts] :or {added-opts {}}}
+          (if (-> args last map?) (last args) {})
           args (if (-> args last map?) (butlast args) args)
           [text add-kind redirect add-path key] args
      on-click (on-click-nav add-kind
@@ -65,64 +65,92 @@
      (button text on-click added-opts key)))
 
  (defn select-buttons [item-path item-info redirect]
-   [:section.button-area
-   ( for [[opt-key opt-info] (:options item-info)]
-   (toggle-button
-    (:name opt-info)
-    (rf-dp-fn (if (= (:type item-info) "multiselect") :toggle-multi-select :toggle-single-select) item-path opt-key)
-    (:selected opt-info)
-    (str item-path "-" opt-key)))
- ^{:key (str item-path "-add")}[:input {
-   :type "button" :value (str "Add " (:name item-info))
+   [rc/h-box
+   :children (conj
+   (vec ( for [[opt-key opt-info] (:options item-info)]
+   ^{:key (str item-path "-" opt-key)}[rc/button
+    :label (:name opt-info)
+    :on-click (rf-dp-fn (if (= (:type item-info) "multiselect") :toggle-multi-select :toggle-single-select) item-path opt-key)
+    :style (rc-toggle-style (:selected opt-info)) ; Should use class + css stylesheet
+    ]
+    ))
+ ^{:key (str item-path "-add")}[rc/button
+   :label (str "Add " (:name item-info))
    :on-click (on-click-nav :add-item {:type (string/join "/" (map name item-path)) :key (random-uuid)} redirect)
-     }]])
+     ])])
 
 (defn non-button-select [item-path item-info info]
- ^{:key (str item-path "-input")}[:input {
-   :type (:type item-info)
-   :on-change (fn [e] (rf/dispatch [:add-entry-db-info item-path (event-val e)]) )
-   :value (item-info :selected)
- }])
+  (let [model-val (item-info :selected)
+        on-change-fn (fn [e] (rf/dispatch [:add-entry-db-info item-path e]) )
+        key-val (str item-path "-input")
+  ]
+  (case (:type item-info)
+        "string" ^{:key key-val}[rc/input-text
+        :model model-val
+        :on-change on-change-fn
+        ]
+        "date" ^{:key key-val}[rc/datepicker-dropdown
+        :model model-val
+        :on-change on-change-fn
+        ])))
 
  (defn select-area
    ([iterable redirect] (select-area iterable redirect []))
    ([iterable redirect path-prefix]
-     (for [[item-key item-info] iterable]
+     [rc/v-box
+     :gap "10px"
+     :children (for [[item-key item-info] iterable]
        (let [item-path (conj path-prefix item-key)]
-       ^{:key (str item-key "-section")}[:section.select-area
-         ^{:key (str item-key "-header")}[:h2 (str (:name item-info) " Select")]
+       ^{:key (str item-key "-section")}[rc/v-box
+       :style {:border "1px solid lightgray"
+        :padding "8px"
+        :border-radius "4px"
+     }
+        :children
+         [^{:key (str item-key "-header")}[rc/title :label (str (:name item-info) " Select") :level :level2]
          (if (string/includes? (:type item-info) "select")
              (select-buttons item-path item-info redirect)
              (non-button-select item-path item-info iterable)
-           )]
-     ))))
+           )]]
+     ))]))
 
+(def tabs-definition
+  [{:id :home :label "Home"}
+  {:id :about :label "About"}
+  {:id :entry :label "Entry"}
+  ])
+
+ (defn nav-link [uri title page]
+   [:a.navbar-item
+    {:href   uri
+     :class (when (= page @(rf/subscribe [:common/page-id])) :is-active)}
+    title])
+
+(defn change-tab-fn [label]
+  (rf/dispatch [ :common/navigate! (if (some #{:home :about} [label]) label :entry)])
+)
 (defn navbar []
-  (r/with-let [expanded? (r/atom false)]
-              [:nav.navbar.is-info>div.container
-               [:div.navbar-brand
-                [:a.navbar-item {:href "/" :style {:font-weight :bold}} "ski-tracks"]
-                [:span.navbar-burger.burger
-                 {:data-target :nav-menu
-                  :on-click #(swap! expanded? not)
-                  :class (when @expanded? :is-active)}
-                 [:span][:span][:span]]]
-               [:div#nav-menu.navbar-menu
-                {:class (when @expanded? :is-active)}
-                [:div.navbar-start
-                 [nav-link "#/" "Home" :home]
-                 [nav-link "#/about" "About" :about]
-                 [nav-link "#/entry" "Entry" :entry]
-                 ]]]))
+  (let [selected-tab-id @(rf/subscribe [:common/tab-id])
+               change-tab change-tab-fn]
+              [rc/horizontal-tabs
+              :model selected-tab-id
+              :tabs tabs-definition
+              :on-change change-tab
+              ]))
 
 (defn home-page []
-[:section.section>div.container>div.content
- [:h1 "Welcome"]
- (button "Start Entry" (on-click-nav :entry))])
+  [rc/v-box
+    :height "100%"
+    :children [
+      [rc/title :label "Welcome" :level :level1]
+      [rc/button :label "Start Entry" :on-click (on-click-nav :entry)]
+    ]])
 
 (defn about-page [_]
-  [:section.section>div.container>div.content
-   [:img {:src "/img/warning_clojure.png"}]])
+  [rc/h-box
+  :children[
+   [:img {:src "/img/warning_clojure.png"}]
+   [rc/p "And Re-com"]]])
 
 (defn all-valid? [info]
  (not (some false? (map (fn [[_ v]] (v :valid?)) info))))
@@ -132,39 +160,39 @@
    info @(rf/subscribe [:entry-info])
    complete (all-valid? info)
    ]
- [:section.section>div.container>div.content
-  [:h1 "Entry Start"]
-   (select-area info {:url-key :entry} [:entry-info])
-   [:section.submit-area
-     (disable-button "Start Entry" (on-click-nav :skier-select) (not complete))
-       ]]))
+  [rc/v-box
+  :gap "30px"
+  :children [
+    [rc/title :label "Entry Start" :level :level1]
+    (select-area info {:url-key :entry} [:entry-info])
+    [rc/button :label "Start Entry" :disabled? (not complete)
+    :on-click (on-click-nav :skier-select) ]
+       ]]
+       ))
 
  (defn skier-select-page [_]
-   [:section.section>div.container>div.content
+
    (let [
      skiers @(rf/subscribe [:active-skiers])
      all-valid-skiers? (some false?
        (map #(-> % second :attributes all-valid?) skiers))
    ]
-    [:section.body
-      [:section.title
-       [:h1 "Active Skier Select"]
-      ]
-    [:section.button-area
-    (for [[key info] skiers]
-       (toggle-button (:name info)
-         (on-click-nav :skier-gear {:skier-id key})
-         (all-valid? (:attributes info))
-         (str (:name info) "-select"))
-     )]
-    [:section.submit
-      (disable-button "Continue to Runs"
-       (on-click-nav :run-select) all-valid-skiers?)
-    ]
-    ])])
+   [rc/v-box
+   :gap "30px"
+   :children [
+     [rc/title :label "Active Skier Select" :level :level1]
+     [rc/h-box
+     :children (for [[key info] skiers]
+       ^{:key (str (:name info) "-select")}[rc/button
+        :label (:name info)
+        :on-click (on-click-nav :skier-gear {:skier-id key})
+        :style (rc-toggle-style (all-valid? (:attributes info)))
+       ])]
+     [rc/button :label "Continue to Runs" :disabled? all-valid-skiers? :on-click (on-click-nav :run-select)]
+    ]]))
 
 (defn skier-gear-page [_]
-  [:section.section>div.container>div.content
+
   (let [
     skier-id (keyword @(rf/subscribe [:get-path-param :skier-id]))
     skier-info @(rf/subscribe [:skier-info skier-id])
@@ -173,16 +201,20 @@
     path-to-attributes [:entry-info :people :options skier-id :attributes]
     redirect {:url-key :skier-gear :params {:skier-id skier-id}}
   ]
-  [:section.body
-    [:section.title
-      [:h1 "Gear Selection for " (:name skier-info)]
+    [rc/v-box
+      :gap "10px"
+      :children [
+        [rc/title :label (str "Gear Selection for " (:name skier-info)) :level :level1]
+
+        (select-area (:attributes skier-info) redirect path-to-attributes)
+        [rc/button :label "Add Item Type" :on-click (on-click-nav :add-item
+          {:type (string/join "/" (map name (pop path-to-attributes)))
+          :key (random-uuid)} redirect)]
+        [rc/button :label "Return to Skier Select"  :on-click (on-click-nav :skier-select)
+        :style (rc-toggle-style valid-selections? )]
+        ]
     ]
-    (select-area (:attributes skier-info) redirect path-to-attributes)
-    [:section.submit
-      (add-button "Add Item Type" :add-item redirect (pop path-to-attributes))
-      (toggle-button "Return to Skier Select" (on-click-nav :skier-select) valid-selections? "ret")
-    ]]
-  )])
+  ))
 
 (defn run-vert [grouped type]
   (apply + (map :vert (type grouped)))
@@ -195,7 +227,6 @@
       (count runs))))
 
 (defn run-select-page []
-  [:section.section>div.container>div.content
   (let [
     resort-id @(rf/subscribe [:active-resort-id])
     run-opts @(rf/subscribe [:resort-runs])
@@ -206,57 +237,83 @@
     path-to-attributes [:entry-info :resort :options resort-id :attributes]
     redirect {:url-key :run-select}
     ]
-    [:section.body
-      [:section.title [:h1 "Select Runs"]]
-      [:section.totals
-        [:span (str "Lifts " (run-count grouped-runs :lift))]
-        [:span (str "Hikes " (run-count grouped-runs :hike))]
-        [:span (str "Runs " (run-count grouped-runs :ski))]
-        [:span (str "Lift Vert " (run-vert grouped-runs :lift))]
-        [:span (str "Hike Vert " (run-vert grouped-runs :hike))]
+    [rc/v-box
+    :children [
+      [rc/title :label "Select Runs" :level :level1]
+      [rc/h-box
+      :gap "5px"
+      :children
+      [
+        [rc/label :label (str "Lifts " (run-count grouped-runs :lift))]
+        [rc/line :size  "1px" :color "gray"]
+        [rc/label :label (str "Hikes " (run-count grouped-runs :hike))]
+        [rc/line :size  "1px" :color "gray"]
+        [rc/label :label (str "Runs " (run-count grouped-runs :ski))]
+        [rc/line :size  "1px" :color "gray"]
+        [rc/label :label (str "Lift Vert " (run-vert grouped-runs :lift))]
+        [rc/line :size  "1px" :color "gray"]
+        [rc/label :label (str "Hike Vert " (run-vert grouped-runs :hike))]]
       ]
-      [:section.entry
-        (for [[kw value] [[:comment comment] [:hike-vert-mod hike-vert-mod]]]
-          (let [
-            section (keyword (str "section." (name kw)))
-            title (as-> kw k (name k) (string/split k #"-" )
-              (map string/capitalize k) (string/join " " k))]
-
-            ^{:key (str kw "-section")}[section
-              ^{:key (str kw "-title")}[:h3 title]
-              ^{:key (str kw "-input")}[:input {:type :text :name kw :on-change (fn [e]
-                (rf/dispatch [:update-run-info kw (event-val e)]))
-                :value value}]]))
-
-        (when (not valid-hike-mod?) [:h4 "Hike Mod must be Int"])
-      [:section.run-select
+      [rc/v-box
+        :children [
+          [rc/title :label "Comment" :level :level2]
+          [rc/input-text :model comment :change-on-blur? false :on-change (fn [e] (rf/dispatch [:update-run-info :comment e]))]
+        ]
+      ]
+      [rc/v-box
+        :children [
+          [rc/title :label "Hike Vert Mod" :level :level2]
+          [rc/input-text :model (str hike-vert-mod) :change-on-blur? false :on-change (fn [e] (rf/dispatch [:update-run-info :hike-vert-mod (js/parseInt e)]))
+          :validation-regex #"-?\d+"]
+        ]
+      ]
+      [rc/v-box
+        :children
           (for [type [:hike :lift :ski]]
             (let [info (type run-opts)]
-          ^{:key (str type "-section")}[:section.type
-          ^{:key (str type "-header")}[:h3 (-> type name string/capitalize)]
-            (for [[id run-info] (:options info)]
+          ^{:key (str type "-section")}[rc/v-box
+          :children
+          [
+          ^{:key (str type "-header")}[rc/title :label (-> type name string/capitalize) :level :level2]
+          [rc/h-box
+          :gap "7px"
+          :children
+            (conj (vec (for [[id run-info] (:options info)]
             (let [run-entry (merge
                 {:key id :type type :comment comment}
                 (select-keys run-info [:name :vert]))]
-              ^{:key (str (:name run-info) "-button-and-count")}[:span.button-and-count
-              (disable-button (:name run-info) (rf-dp-fn :add-run run-entry)
-                (not valid-hike-mod?) (str id "-select"))
-              ^{:key (str (:name run-info) "-Count")}[:span (run-count grouped-runs type [:key id])]]))
+              ^{:key (str (:name run-info) "-button-and-count")}[rc/h-box
+              :gap "3px"
+              :children
+              [^{:key (str id "-select")}[rc/button
+              :label (:name run-info) :on-click (rf-dp-fn :add-run run-entry) :disabled? (not valid-hike-mod?)]
 
-            (add-button (str "Add " (name type)) :add-item
-              redirect (conj path-to-attributes type) (str type "-add")
-              {:added-opts {:style {:color "white" :background-color "red"}}})
-          ]))]]
-    [:section.runs-completed
-      (for [[num run] runs-entered]
-        ^{:key (str (:type run) (:name run) num "-header-entered")}[:div
-          (str (-> run :type name string/capitalize) " " (:name run) " " (:comment run))])
-      [:input {:type :button :value "Delete Last" :on-click (rf-dp-fn :delete-last-run)}]]
-    [:section.submit
-      (disable-button "Submit Observation" (rf-dp-fn :add-observation) (< (count runs-entered) 2))
-    ]
+              ^{:key (str (:name run-info) "-Count")}[rc/label :label (run-count grouped-runs type [:key id])]]
+              ])))
+
+            ^{:key (str type "-add")}[rc/button :label (str "Add " (name type))
+            :on-click (on-click-nav :add-item
+              {:type (string/join "/" (map name (conj path-to-attributes type)))
+              :key (random-uuid)} redirect)
+            :style {:color "white" :background-color "red"}])
+            ]]
+          ]))]
+    [rc/v-box
+      :gap "5px"
+      :children [
+      [rc/title :label "History" :level :level3]
+      [rc/v-box :children (for [[num run] runs-entered]
+        ^{:key (str (:type run) (:name run) num "-header-entered")}[rc/title :label
+          (str (-> run :type name string/capitalize) " " (:name run) " " (:comment run)) :level :level4])]
+
+      [rc/button :label "Delete Last" :on-click (rf-dp-fn :delete-last-run)]
+      [rc/line :size "2px" :color "black"]
+      [rc/button :label "Submit Observation" :on-click (rf-dp-fn :add-observation) :disabled? (< (count runs-entered) 2)]
       ]
-)])
+      ]
+    ]
+    ]
+))
 
  (defn need-vert? [path-seq]
    (some #{:hike :lift} path-seq ))
@@ -285,7 +342,6 @@
     (constantly false)))
 
 (defn add-item-page []
-  [:section.section>div.container>div.content
   (let [ {:keys [path kind] :as new-info} @(rf/subscribe [:new-entry])
         parent-info @(rf/subscribe [:item-info path])
         {:keys [url-key params query]} @(rf/subscribe [:query-params])
@@ -302,29 +358,45 @@
                  )
         submit-path (conj path (-> kind name (str "s") keyword) (-> (random-uuid) str keyword))
   ]
-  [:section.body
-    [:section.title [:h1 (str "New " (parent-info :name) (when (= kind :attribute) " Item Type"))]]
-    [:section.entry
+  [rc/v-box
+  :gap "10px"
+  :children [
+  [rc/title :label (str "New " (parent-info :name) (when (= kind :attribute) " Item Type")) :level :level1]
+  [rc/v-box
+  :gap "10px"
+  :children
     (for [[input type] inputs]
-      ^{:key (str input "-section")}[:section
-        ^{:key (str input "-title")}[:h3 (-> input name string/capitalize)]
-        (if (vector? type)
-          (for [opt type]
-            (toggle-button (-> opt str string/capitalize)
-              (rf-dp-fn [:update-new input opt])
-              (= (input new-info) opt) (str opt "-select")))
-          ^{:key (str input "-input")}[:input {:type type :name input
+      ^{:key (str input "-section")}[rc/v-box
+      :style {:border "1px solid lightgray"
+       :padding "8px"
+       :border-radius "4px"
+    }
+        :children [
+          ^{:key (str input "-title")}[rc/title :label (-> input name string/capitalize) :level :level2 :margin-top "0px"]
+          (if (vector? type)
+            [rc/h-box
+            :gap "10px"
+            :children (for [opt type]
+              ^{:key (str opt "-select")}[rc/button
+                :label (-> opt str string/capitalize)
+                :on-click (rf-dp-fn [:update-new input opt])
+                :style (rc-toggle-style (= (input new-info) opt))]
+                )]
+            ^{:key (str input "-input")}[rc/input-text
+            :model (str (new-info input))
             :on-change (fn [e]
               (rf/dispatch [:update-new input
-                (cond-> (event-val e) (= type :number) (js/parseInt))]))}])])]
-    [:section.submit-area
-      (disable-button "Save Item"
-        (rf-dp-fn :save-new submit-path cljs-query-params) (not complete?))
-      [:input
-        {:type :button :value "Discard Item"
-      :on-click (on-click-nav (:url-key cljs-query-params) (:params cljs-query-params) (:query cljs-query-params))}]]
-      ]
-  )])
+                (cond-> e (= type :number) (js/parseInt))]))
+            :validation-regex ( if (= type :number) #"\d+" #".+")])]])]
+      [rc/h-box
+      :gap "10px"
+      :children [
+        [rc/button :label "Save Item"
+        :on-click (rf-dp-fn :save-new submit-path cljs-query-params)
+        :disabled? (not complete?)]
+        [rc/button :label "Discard Item"
+        :on-click (on-click-nav (:url-key cljs-query-params) (:params cljs-query-params) (:query cljs-query-params))
+        ]]]]]))
 
 (defn page []
   (if-let [page @(rf/subscribe [:common/page])]

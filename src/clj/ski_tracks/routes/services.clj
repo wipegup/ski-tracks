@@ -185,7 +185,14 @@
               (let [
                 pk "obs"
                 rk (str (ts))
-                put (put-item pk rk (dissoc d :common/route))
+                ctx (dissoc (d :entry-info) :people :resort)
+                p (-> d :entry-info :people)
+                p-list  (into {} (filter #( (second %) :selected) (p :options) ))
+                pl-attr (m)
+                resort (-> d :entry-info :resort)
+
+                ri (d :run-info)
+                put (put-item pk rk clean)
               ]
               {
                 :status (if put 200 400)

@@ -91,6 +91,7 @@ data: <map>
 ;; In lieu of maintaining a "latest" value which tells the specific RK to query
 ;; Not too worried about read/write costs
 ; (far/query ddb-opts ddb-table {:pk [:eq "context"]} {:return [:rk :data] :order :desc :limit 1})
+; (far/query ddb-opts ddb-table {:pk [:eq "obs"]} {:return [:rk :data] :order :desc :limit 1})
 ```
 
 
